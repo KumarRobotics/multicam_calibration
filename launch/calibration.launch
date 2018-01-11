@@ -6,7 +6,7 @@
     clear_params="true" output="screen">
     <rosparam file="$(find multicam_calibration)/config/aprilgrid.yaml"/>
     <rosparam file="$(arg calib_dir)/$(arg device)-initial.yaml"/>
-    <param name="use_approximate_sync" value="false"/>
+    <param name="use_approximate_sync" value="true"/>
     <param name="calib_dir" value="$(arg calib_dir)"/>
     <param name="latest_link_name" value="$(arg device)-latest.yaml"/>
     <param name="output_filename" value="$(arg device)"/>

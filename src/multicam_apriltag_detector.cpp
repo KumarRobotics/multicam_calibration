@@ -43,15 +43,6 @@ namespace multicam_calibration {
     detector_->set_black_border(2);
   }
 
-  apriltag_ros::ApriltagVec filter_tags(const apriltag_ros::ApriltagVec &v) {
-    apriltag_ros::ApriltagVec ret;
-    for (const auto &t: v) {
-      //if (t.id == 0) ret.push_back(t);
-      ret.push_back(t);
-    }
-    return (ret);
-  }
-
   std::vector<apriltag_ros::ApriltagVec>
   MultiCamApriltagDetector::process(std::vector<ImageConstPtr> const &msg_vec,
                                     CamWorldPoints *worldPoints,
@@ -77,7 +68,6 @@ namespace multicam_calibration {
       cv::Mat const img = cv_ptr->image;
       // detect & refine
       auto img_apriltags = detector_->Detect(img);
-      //img_apriltags = filter_tags(img_apriltags);
       apriltag_ros::RefineApriltags(img, img_apriltags);
       detected_tags[cam_idx] = img_apriltags;
       // Store
@@ -87,6 +77,11 @@ namespace multicam_calibration {
       for(auto const &tag : img_apriltags)
         {
           int const id = tag.id;
+          if (id >= num_tags) {
+            ROS_WARN_STREAM("tag with invalid id found: "
+                            << id << " (check your calibration target!)");
+            continue;
+          }
           std::array<Point2f, 4> const corner_positions =
             get_tag_corner_positions(id);
           tag_corners[cam_idx][id].found = true;
@@ -97,12 +92,12 @@ namespace multicam_calibration {
               worldPoints->back().emplace_back(wp.x, wp.y, 0);
               imagePoints->back().emplace_back(ip.x, ip.y);
 
-              tag_corners[cam_idx][id].corners[k].x = tag.corners[k].x;
-              tag_corners[cam_idx][id].corners[k].y = tag.corners[k].y;
+              tag_corners[cam_idx][id].corners[k].x = ip.x;
+              tag_corners[cam_idx][id].corners[k].y = ip.y;
               std::stringstream ss;
               ss << frame_count_ << ", intrinsics, " << cam_idx << ", "
                  << wp.x << ", " << wp.y << ", "
-                 << tag.corners[k].x << ", " << tag.corners[k].y << std::endl;
+                 << ip.x << ", " << ip.y << std::endl;
               std::string v = ss.str();
               outstr[cam_idx] += v;
             }
