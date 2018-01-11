@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>multicam_calibration</name>
+  <version>0.0.0</version>
+  <description>package for camera calibration</description>
+
+  <maintainer email="bernd.pfrommer@gmail.com">Bernd Pfrommer</maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <depend>apriltag_msgs</depend>
+  <depend>apriltag_ros</depend>
+  <depend>image_transport</depend>
+  <depend>nodelet</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>eigen_conversions</depend>
+  <depend>tf2_ros</depend>
+  <depend>libceres-dev</depend>
+  <export>
+    <nodelet plugin="${prefix}/nodelet_plugin.xml"/>
+  </export>
+</package>

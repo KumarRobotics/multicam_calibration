@@ -1,0 +1,18 @@
+<library path="lib/libcalibration_nodelet">
+  <class name="multicam_calibration/CalibrationNodelet"
+         type="multicam_calibration::CalibrationNodelet"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      calibration nodelet
+    </description>
+  </class>
+</library>
+<library path="lib/libcalibration_test_nodelet">
+  <class name="multicam_calibration/CalibrationTestNodelet"
+         type="multicam_calibration::CalibrationTestNodelet"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      calibration test nodelet
+    </description>
+  </class>
+</library>
