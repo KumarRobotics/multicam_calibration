@@ -5,6 +5,8 @@
 
 #ifndef MULTICAM_CALIBRATION_CAMERA_EXTRINSICS_H
 #define MULTICAM_CALIBRATION_CAMERA_EXTRINSICS_H
+
+#include <vector>
 #include <Eigen/Core>
 
 namespace multicam_calibration {

@@ -275,16 +275,15 @@ namespace multicam_calibration {
         frame_image_points.push_back(imagePoints_[cam_idx][fnum]);
         frame_num_points += frame_world_points[cam_idx].size();
       }
-      std::shared_ptr<FrameResidual> fr(
-        new FrameResidual(frame_world_points, frame_image_points, calibrationData_,
-                          extrinsicsBase));
+      const auto fr = FrameResidual(frame_world_points, frame_image_points,
+                                    calibrationData_, extrinsicsBase);
       const unsigned numResiduals = 2 * frame_num_points;
-      double residuals[numResiduals];
+      std::vector<double> residuals(numResiduals);
       // point offset to cam0 pose for this particular frame
       const auto R_vec_offset = totNumCameraParams + 6 * fnum;
       double const * const params[2] = {&params_[0], &params_[R_vec_offset]};
       // compute residuals
-      (*fr)(params, residuals);
+      fr(params, residuals.data());
       // unpack residuals into vector of vectors of vectors
       res.push_back(std::vector<std::vector<Vec2d>>()); // empty for this frame
       for (const auto cam_idx : irange(0u, num_cameras)) {
