@@ -84,6 +84,7 @@ namespace multicam_calibration {
     subscribe();
     std::string filename;
     if (nh.getParam("corners_file", filename)) {
+      if (filename == "") return;
       if (!readPointsFromFile(filename)) {
         ROS_ERROR_STREAM("file not found or bad: " << filename);
       } else {
@@ -370,6 +371,7 @@ namespace multicam_calibration {
   }
   
   void CalibrationNodelet::writeCalibration(std::ostream &os, const CalibDataVec &results) {
+    CameraExtrinsics T_cnm1_0 = identity();
     for (unsigned int cam_idx = 0; cam_idx < results.size(); cam_idx++) {
       const CalibrationData &cd = results[cam_idx];
       os << cd.name << ":" << std::endl;
@@ -377,10 +379,12 @@ namespace multicam_calibration {
         os << "  T_cam_imu:" << std::endl;
         print_tf(os, "  ", cd.T_cam_imu);
       }
+      CameraExtrinsics T_cn_cnm1 = cd.T_cn_cnm1 * T_cnm1_0.inverse();
       if (cam_idx > 0) {
         os << "  T_cn_cnm1:" << std::endl;
-        print_tf(os, "  ", cd.T_cn_cnm1);
+        print_tf(os, "  ", T_cn_cnm1);
       }
+      T_cnm1_0 = cd.T_cn_cnm1;
       const CameraIntrinsics &ci = cd.intrinsics;
       os << "  camera_model: " << ci.camera_model << std::endl;
       os << "  intrinsics: " << vec2str(ci.intrinsics) << std::endl;
