@@ -130,7 +130,7 @@ namespace multicam_calibration {
       const unsigned numResiduals = 2 * frame_num_points;
       std::vector<double> residuals(numResiduals);
       // point offset to cam0 pose for this particular frame
-      const auto R_vec_offset = totNumCameraParams + 6 * (num_cameras-1) * fnum;
+      const auto R_vec_offset = totNumCameraParams + 6 * fnum;
       double const * const params[2] = {&params_[0], &params_[R_vec_offset]};
       // compute residuals
       fr(params, residuals.data());
