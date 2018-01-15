@@ -97,6 +97,7 @@ namespace multicam_calibration {
       //std::cout << "   image undist: " << std::endl;
       //std::cout << ipu << std::endl;
       // Use opencv to calculate the homography matrix.
+      // TODO: what about alternative findHomography parameters?
       cv::Mat H = cv::findHomography(wp, ipu);
 
       // now decompose the homography matrix

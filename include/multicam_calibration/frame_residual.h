@@ -36,15 +36,13 @@ namespace multicam_calibration {
     template <typename T>
     bool operator()(T const *const *params, T *residual) const
     {
+      const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[1][0]);
+      const Mat<T, 3, 3>  R_frame = rotation_matrix(R_vec_frame);
+      const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[1][3]);
 
       unsigned int residual_count = 0;
       unsigned int intrinsics_offset = 0;
-      for(const auto cam_idx : irange(0u, (unsigned int)cams_.size())) {
-        auto guess_idx = (cam_idx == 0) ? cam_idx : cam_idx - 1;
-        const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[1][6*guess_idx]);
-        const Mat<T, 3, 3>  R_frame = rotation_matrix(R_vec_frame);
-        const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[1][6*guess_idx + 3]);
-        
+      for(const auto cam_idx : irange(0u, (unsigned int)cams_.size())) {        
         const CalibrationData &cam = cams_[cam_idx];
         Mat<T, 3, 3> K = Mat<T, 3, 3>::Identity();
         K(0, 0) = params[0][intrinsics_offset];
@@ -68,7 +66,6 @@ namespace multicam_calibration {
           const auto extrinsic_start_idx = extrinsics_base_offset_ + 6 * (cam_idx - 1);
           const Vec<T, 3> R_vec_cam =
             Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx]);
-          //std::cout << "rvec: " << R_vec_cam(0, 0) << " " << R_vec_cam(1,0) << " " << R_vec_cam(2,0) << std::endl;
           R_cam = rotation_matrix(R_vec_cam); // rotation vector
           t_cam = 
             Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx + 3]);

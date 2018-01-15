@@ -62,11 +62,15 @@ namespace multicam_calibration {
     void publishDebugImages(const std::vector<ImageConstPtr> &msg_vec,
                             const std::vector<apriltag_ros::ApriltagVec> &detected_tags);
     void publishTagCounts();
-    bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsicsVec& cam0tf, bool estimate_transform=false) ;
+    bool guessRigPose(const CamWorldPoints &wp,
+                      const CamImagePoints &ip,
+                      CameraExtrinsics& rigtf) ;
     void writeCalibration(std::ostream &os, const CalibDataVec &results);
     void homographyTest(const CalibDataVec &results) const;
     void testCalibration();
     bool readPointsFromFile(const std::string &fname);
+    void warning(const std::string &param, const std::string &cam);
+    
     // ---------- variables
     std::unique_ptr<MultiCamApriltagDetector> detector_;
     std::vector<std::shared_ptr<image_transport::SubscriberFilter> > sub_;
@@ -94,7 +98,10 @@ namespace multicam_calibration {
     int skipCount_{0};
     int skipFrames_{1};
     bool cameras_ready_;
-    
+    bool estimate_intrinsics_;
+    bool freeze_intrinsics_;
+    bool estimate_transform_;
+    int num_intrinsic_frame_samples_;
   };
 }
 #include <pluginlib/class_list_macros.h>

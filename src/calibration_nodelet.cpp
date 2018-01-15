@@ -46,16 +46,26 @@ namespace multicam_calibration {
     cameras_ready_ = false;
     calibrator_.reset(new Calibrator());
     ros::NodeHandle nh = getPrivateNodeHandle();
+
+    nh.getParam("use_approximate_sync", use_approximate_sync_);
+    detector_.reset(new MultiCamApriltagDetector(nh));
+    nh.param<int>("skip_num_frames", skipFrames_, 1);
+    nh.param<bool>("estimate_intrinsics", estimate_intrinsics_, false);
+    nh.param<bool>("freeze_intrinsics", freeze_intrinsics_, false);
+    nh.param<bool>("estimate_extrinsics", estimate_transform_, false);
+    nh.param<int>("num_intrinsic_frame_samples", num_intrinsic_frame_samples_, 20);
+
+    ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
+    ROS_INFO_STREAM((estimate_intrinsics_ ? "" : "not ") << "estimating intrinsics");
+    ROS_INFO_STREAM((estimate_transform_ ? "" : "not ") << "estimating extrinsics");
+    ROS_INFO_STREAM((freeze_intrinsics_ ? "" : "not ") << "freezing intrinsics");    
+    
     try {
       parseCameras();
     } catch (const std::runtime_error &e) {
       ROS_ERROR_STREAM("error parsing cameras: " << e.what());
       ros::shutdown();
     }
-    nh.getParam("use_approximate_sync", use_approximate_sync_);
-    ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
-    detector_.reset(new MultiCamApriltagDetector(nh));
-    nh.param<int>("skip_num_frames", skipFrames_, 1);
     
     image_transport::ImageTransport it(nh);
     for (const auto &camdata : cameras_) {
@@ -92,6 +102,15 @@ namespace multicam_calibration {
     throw (std::runtime_error("cannot find " + param + " for cam " + cam));
   }
 
+  void CalibrationNodelet::warning(const std::string &param, const std::string &cam) {
+    ROS_WARN_STREAM("Cannot find " << param << " for cam " << cam);
+    if ((param == "/intrinsics" || param == "/distortion_coeffs")
+        && !estimate_intrinsics_) {
+      ROS_ERROR_STREAM("!! Not currently estimating intrinsics, "
+                       "this is probably not what you want");
+    }
+  }
+
   static CameraExtrinsics get_transform(const ros::NodeHandle &nh, const std::string &field,
                                         const CameraExtrinsics &def) {
     CameraExtrinsics T(def);
@@ -104,34 +123,40 @@ namespace multicam_calibration {
 
   void CalibrationNodelet::parseCameras() {
     ros::NodeHandle nh = getPrivateNodeHandle();
-    //std::vector<std::string> camNames = {"cam0", "cam1", "cam2"};    
-    //for (const auto &cam : camNames) {
-    bool done = false;
+
     int cam_index = 0; 
-    while (!done) {
+    while (true) {
       std::string cam = "cam" + std::to_string(cam_index);
       XmlRpc::XmlRpcValue lines;
-      if (!nh.getParam(cam, lines)) {
-        done = true;
-        break;
-      }
+      if (!nh.getParam(cam, lines)) break; // no more cameras!
       ROS_INFO_STREAM("Parsing " << cam);
       CalibrationData calibData;
       calibData.name = cam;
       CameraIntrinsics &ci = calibData.intrinsics;
-      // if (!nh.getParam(cam + "/distortion_coeffs",
-      //                  ci.distortion_coeffs)) { bombout("distortion_coeffs", cam); }
-      // if (!nh.getParam(cam + "/intrinsics",  ci.intrinsics)) { bombout("intrinsics", cam); }
-      // if (!nh.getParam(cam + "/resolution",  ci.resolution)) { bombout("resolution", cam); }
-      if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
-      if (!nh.getParam(cam + "/camera_model",
-                       ci.camera_model)) { bombout("camera_model", cam); }
-      if (!nh.getParam(cam + "/distortion_model",
-                       ci.distortion_model)) { bombout("distortion_model", cam); }
+      if (!nh.getParam(cam + "/distortion_coeffs", ci.distortion_coeffs)) {
+        warning("distortion_coeffs", cam);
+      }
+      if (!nh.getParam(cam + "/intrinsics", ci.intrinsics)) {
+        warning("intrinsics", cam);
+      }
+      if (!nh.getParam(cam + "/resolution", ci.resolution)) {
+        warning("resolution", cam);
+      }
+      if (!nh.getParam(cam + "/rostopic", calibData.rostopic)) {
+        bombout("rostopic", cam);
+      }
+      if (!nh.getParam(cam + "/camera_model", ci.camera_model)) {
+        bombout("camera_model", cam);
+      }
+      if (!nh.getParam(cam + "/distortion_model", ci.distortion_model)) {
+        bombout("distortion_model", cam);
+      }
 
-      // estimate the intrinsics automatically
-      ROS_INFO_STREAM("Collecting samples for intrinsics estimation...");
-      estimate_intrinsics(nh, 25, calibData);
+      if (estimate_intrinsics_) {
+        // estimate the intrinsics automatically      
+        ROS_INFO_STREAM("Collecting samples for intrinsics estimation...");
+        estimate_intrinsics(nh, num_intrinsic_frame_samples_, calibData);
+      }
       
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
@@ -199,8 +224,8 @@ namespace multicam_calibration {
       ROS_ERROR("no residuals found for test!");
       return;
     }
-    Stat totErr;
-    Stat maxErr;
+    Stat totErr(0,0);
+    Stat maxErr(0,0);
     unsigned int  maxErrCam(0);
     std::vector<Stat>   cameraStats(res[0].size(), Stat(0.0, 0));
     std::vector<std::ofstream> resFiles;
@@ -283,21 +308,14 @@ namespace multicam_calibration {
                                             ci2.distortion_model, ci2.distortion_coeffs,
                                             &ipts2proj);
               double e(0);
-              int count = 0;
               for (unsigned int i = 0; i < ipts2.size(); i++) {
-                if (ipts2[i].x < 0 || ipts2proj[i].x < 0 ||
-                    ipts2[i].y < 0 || ipts2proj[i].y < 0 ||
-                    ipts2[i].x >= ci.resolution[0] || ipts2proj[i].x >= ci2.resolution[0] ||
-                    ipts2[i].y >= ci.resolution[1] || ipts2proj[i].y >= ci2.resolution[1])
-                  continue;
                 double dx = (ipts2[i].x - ipts2proj[i].x);
                 double dy = (ipts2[i].y - ipts2proj[i].y);
                 e += dx*dx + dy*dy;
-                count++;
               }
-              double epp = sqrt(e/(double)count); // per pixel error
+              double epp = sqrt(e/(double)ipts2.size()); // per pixel error
               ce.errSum += e;
-              ce.cnt    += count;
+              ce.cnt    += ipts2.size();
               if (epp > 10.0) {
                 ROS_WARN_STREAM("frame " << frame << " tested between cams " << cam_idx
                                 << " and " << cam2_idx << " has high pixel err: " << epp);
@@ -416,56 +434,40 @@ namespace multicam_calibration {
     }
   }
 
-  bool CalibrationNodelet::guessCameraPose(const CamWorldPoints &wp,
-                                           const CamImagePoints &ip,                                           
-                                           CameraExtrinsicsVec& T_board,
-                                           bool estimate_transform)  {
+  bool CalibrationNodelet::guessRigPose(const CamWorldPoints &wp,
+                                        const CamImagePoints &ip,
+                                        CameraExtrinsics& T_board)  {
     using utils::operator*;
-    CameraExtrinsics T_n = identity();
+    size_t max_points = 0;
+    CameraExtrinsics T_n_0 = identity();
     bool poseFound(false);
     for (unsigned int cam_idx = 0; cam_idx < cameras_.size(); cam_idx++) {
       CalibrationData &cd = cameras_[cam_idx];
-      T_n = cd.T_cn_cnm1 * T_n; // chain forward from cam0 to current camera
+      T_n_0 = cd.T_cn_cnm1 * T_n_0; // chain forward from cam0 to current camera
       if (!wp[cam_idx].empty()) {
         const CameraIntrinsics &ci = cd.intrinsics;
-        CameraExtrinsics T_n_w = get_init_pose::get_init_pose(wp[cam_idx], ip[cam_idx], ci.intrinsics,
-                                                              ci.distortion_model, ci.distortion_coeffs);
-        //std::cout << cam_idx << " init pose: " << std::endl << T_n_w << std::endl;
-        if (!poseFound) {
-          // first camera with valid pose found
-          T_board.push_back(T_n_w);
+        CameraExtrinsics T_n_w = get_init_pose::get_init_pose(wp[cam_idx],
+                                                              ip[cam_idx],
+                                                              ci.intrinsics,
+                                                              ci.distortion_model,
+                                                              ci.distortion_coeffs);
+        if (wp[cam_idx].size() > max_points) {
+          // camera with valid pose found
+          max_points = wp[cam_idx].size();
+          T_board = T_n_0.inverse() * T_n_w;
           poseFound = true;
-        } else {
-          T_board.push_back(T_n_w);
-          if (estimate_transform) {
-            CameraExtrinsics& T_nm1_w = T_board[cam_idx-1];
-            CameraExtrinsics T_cn_cnm1_est = T_nm1_w.inverse() * T_n_w;
-
-            std::vector<double> tcn = utils::transform_to_rvec_tvec(cd.T_cn_cnm1);
-            std::vector<double> rtvec = utils::transform_to_rvec_tvec(T_cn_cnm1_est);
-            std::vector<double> tcn_adj = tcn * 0.9;
-            std::vector<double> rtvec_adj = rtvec * 0.1;
-            CameraExtrinsics T0, T1;
-            utils::rvec_tvec_to_transform(tcn * 0.9, T0);
-            utils::rvec_tvec_to_transform(rtvec * 0.1, T1);
-            cd.T_cn_cnm1 = T0 * T1;
-          }
-          // XXX issue warning if error is too big!
-          //
-          // Not sure what this is for, since we don't want to have accurate estimates!
-          // 
-          // CameraExtrinsics T_0_w_test = T_n_0.inverse() * T_n_w;
-          // CameraExtrinsics T_err = T_0_w_test.inverse() * (*T_0_w);
-          // double rot_err = 1.5 - 0.5 *(T_err(0,0) + T_err(1,1) + T_err(2,2));
-          // if (rot_err > 0.25) {
-          //   ROS_WARN_STREAM("init tf for camera " << cam_idx << " is off from your initial .yaml file!");
-          //   ROS_WARN_STREAM("expected T_n_0 from " << cam_idx << " to cam 0 is roughly:");
-          //   ROS_WARN_STREAM(T_n_w * T_0_w->inverse());
-          // }
-          //std::cout << "T_err: " << std::endl << T_err << std::endl;
-          //double trans_err = T_err.block<3,1>(0,3).norm();//std::abs(T_err(3,0)) +std::abs(T_err(3,1)) +std::abs(T_err(3,2))
-          //std::cout << "rot error: " << rot_err << " trans error: " << trans_err <<std::endl;
         }
+        if (poseFound) {
+          // XXX issue warning if error is too big!
+          CameraExtrinsics T_0_w_test = T_n_0.inverse() * T_n_w;
+          CameraExtrinsics T_err = T_0_w_test.inverse() * T_board;
+          double rot_err = 1.5 - 0.5 *(T_err(0,0) + T_err(1,1) + T_err(2,2));
+          if (rot_err > 0.25) {
+            ROS_WARN_STREAM("init tf for camera " << cam_idx << " is off from your initial .yaml file!");
+            ROS_WARN_STREAM("expected T_n_0 from " << cam_idx << " to cam 0 is roughly:");
+            ROS_WARN_STREAM(T_n_w * T_board.inverse());
+          }
+        }        
       }
     }
     return (poseFound);
@@ -564,12 +566,12 @@ namespace multicam_calibration {
         wp.push_back(worldPoints_[camid][fnum]);
         ip.push_back(imagePoints_[camid][fnum]);
       }
-      CameraExtrinsicsVec camPoses;
-      if (!guessCameraPose(wp, ip, camPoses)) {
+      CameraExtrinsics camPose;
+      if (!guessRigPose(wp, ip, camPose)) {
         ROS_WARN_STREAM("no detections found, skipping frame " << fnum);
         continue;
       }
-      calibrator_->addPoints(frameNum_, wp, ip, camPoses);
+      calibrator_->addPoints(frameNum_, wp, ip, camPose);
     }
     return (true);
   }
@@ -586,12 +588,12 @@ namespace multicam_calibration {
     // Insert newly detected points into existing set.
     // At this point one could add the data points to an
     // incremental solver.
-    CameraExtrinsicsVec camPoses;
-    if (!guessCameraPose(wp, ip, camPoses, false)) {
+    CameraExtrinsics camPose;
+    if (!guessRigPose(wp, ip, camPose)) {
       ROS_WARN("no detections found, skipping frame!");
       return;
     }
-    calibrator_->addPoints(frameNum_, wp, ip, camPoses);
+    calibrator_->addPoints(frameNum_, wp, ip, camPose);
 
     // add new frames to each camera
     for (unsigned int cam_idx = 0; cam_idx < wp.size(); cam_idx++) {

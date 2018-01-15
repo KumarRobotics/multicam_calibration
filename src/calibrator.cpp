@@ -33,7 +33,7 @@ namespace multicam_calibration {
 
   void Calibrator::addPoints(int frameNum, const CamWorldPoints &wp,
                              const CamImagePoints &ip,
-                             const CameraExtrinsicsVec &camPoseGuess) {
+                             const CameraExtrinsics &camPoseGuess) {
     if (wp.size() != calibrationData_.size() ||
         ip.size() != calibrationData_.size()) {
       std::cerr << "number of cams != width of array!" << std::endl;
@@ -45,7 +45,7 @@ namespace multicam_calibration {
       FrameImagePoints fip(ip[cam_idx].begin(), ip[cam_idx].end());
       imagePoints_[cam_idx].push_back(fip);
     }
-    camPoseGuess_.push_back(camPoseGuess);
+    rigPoseGuess_.push_back(camPoseGuess);
   }
 
   void Calibrator::initializeVariables(std::vector<double> *param_ptr) {
@@ -71,11 +71,9 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     // initialize pose guess for camera 0
     for(const auto i : irange(0u, num_frames))  {
-      for (size_t j = 0; j < num_cameras-1; ++j) {
-        // add cam pose guess for cameras 0-(n-2) for each frame
-        std::vector<double> rvec_tvec = utils::transform_to_rvec_tvec(camPoseGuess_[i][j]);
-        params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
-      }
+      // add cam pose guess for cameras 0-(n-2) for each frame
+      std::vector<double> rvec_tvec = utils::transform_to_rvec_tvec(rigPoseGuess_[i]);
+      params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
     };
 #ifdef DEBUG_PARAMS    
     utils::print_params(params, calibrationData_);
@@ -223,12 +221,12 @@ namespace multicam_calibration {
                           extrinsicsBase));
       // Per camera intrinsics + (ncam-1) extrinsics
       cost_function->AddParameterBlock(totNumCameraParams);
-      // Pose of cam0 wrt calib board
-      cost_function->AddParameterBlock(6 * (num_cameras-1));
+      // Pose of rig wrt calib board
+      cost_function->AddParameterBlock(6);
        // Reprojection error
       cost_function->SetNumResiduals(2 * frame_num_points);
       // point offset to cam0 pose for this particular frame
-      const auto R_vec_offset = totNumCameraParams + 6 * i * (num_cameras-1);
+      const auto R_vec_offset = totNumCameraParams + 6 * i;
       problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0),
                                &params[0], &params[R_vec_offset]);
       //problem.SetParameterBlockConstant(&params[0]);
