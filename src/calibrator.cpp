@@ -307,26 +307,30 @@ namespace multicam_calibration {
     unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
     unsigned int intrinsics_offset = 0;
 
+    CameraExtrinsics T_cnm1_0   = CameraExtrinsics::Identity();
     for (unsigned int cam_idx = 0; cam_idx < calibrationData_.size(); cam_idx++) {
       CalibrationData cd(calibrationData_[cam_idx]);
+      CameraExtrinsics T_cn_0   = CameraExtrinsics::Identity();
       if (cam_idx > 0) {
         unsigned int off = extrinsicsBase + 6 * (cam_idx - 1);
         const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
         Mat<double, 3, 3>       R = rotation_matrix(rvec);
         const Vec<double, 3>    t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
-        CameraExtrinsics T_cn_cnm1;
 
-        T_cn_cnm1.block<3,3>(0, 0) = R;
-        T_cn_cnm1.block<3,1>(0, 3) = t;
-        T_cn_cnm1(3,3) = 1.0;
+        T_cn_0.block<3,3>(0, 0) = R;
+        T_cn_0.block<3,1>(0, 3) = t;
+        T_cn_0(3,3) = 1.0;
         
-        cd.T_cn_cnm1 = T_cn_cnm1;
-        // propagate forward to T_cn_cam0
+        cd.T_cn_cnm1 = T_cn_0 * T_cnm1_0.inverse();
+
         T_cn_cam0 = cd.T_cn_cnm1 * T_cn_cam0;
         if (isNonZero(T_cam0_imu)) {
-          cd.T_cam_imu = T_cn_cam0 * T_cam0_imu;
+          cd.T_cam_imu = T_cn_0 * T_cam0_imu;
         }
       }
+      
+      T_cnm1_0 = T_cn_0;
+      
       // offset for intrinsics
       for (unsigned int i = 0; i < cd.intrinsics.intrinsics.size(); i++) {
         cd.intrinsics.intrinsics[i] = p[intrinsics_offset + i];
@@ -351,12 +355,12 @@ namespace multicam_calibration {
 
     unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
     // add the extrinsics between cam0 and the rest
+
     unsigned int totNumCameraParams = extrinsicsBase + 6 * (num_cameras - 1);
 
     //
     // Create one FrameResidual for each frame
     //
-    
     for(const auto i : irange(0u, num_frames))  {
       std::vector<FrameWorldPoints> frame_world_points;
       std::vector<FrameImagePoints> frame_image_points;
