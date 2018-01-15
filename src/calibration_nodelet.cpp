@@ -268,7 +268,6 @@ namespace multicam_calibration {
           for (unsigned int cam2_idx = cam_idx; cam2_idx < results.size(); cam2_idx++) {
             CamErr &ce = cam_error[cam2_idx];
             const CalibrationData &cam2 = results[cam2_idx];
-            //T_c2_c1 = (cam2_idx == cam_idx) ? identity() : cam2.T_cn_cnm1 * T_c2_c1; // forward the chain
             T_c2_c1 = (cam2_idx == cam_idx) ? identity() : cam2.T_cn_cnm1 * T_c2_c1; // forward the chain
             CameraExtrinsics T_c2_world = T_c2_c1 * T_c1_world;
             const auto &wpts2 = worldPoints_[cam2_idx][frame];
@@ -588,7 +587,7 @@ namespace multicam_calibration {
     // At this point one could add the data points to an
     // incremental solver.
     CameraExtrinsicsVec camPoses;
-    if (!guessCameraPose(wp, ip, camPoses, true)) {
+    if (!guessCameraPose(wp, ip, camPoses, false)) {
       ROS_WARN("no detections found, skipping frame!");
       return;
     }
