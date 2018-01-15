@@ -5,6 +5,8 @@
 #include "multicam_calibration/calibration_nodelet.h"
 #include "multicam_calibration/camera_extrinsics.h"
 #include "multicam_calibration/get_init_pose.h"
+#include <multicam_calibration/intrinsic_estimator.h>
+#include <multicam_calibration/utils.h>
 #include <memory>
 #include <ctime>
 #include <chrono>
@@ -41,13 +43,11 @@ namespace multicam_calibration {
   }
 
   void CalibrationNodelet::onInit() {
+    cameras_ready_ = false;
     calibrator_.reset(new Calibrator());
     ros::NodeHandle nh = getPrivateNodeHandle();
     try {
       parseCameras();
-      if (cameras_.size() > 3) {
-        throw std::runtime_error("only up to 3 cameras supported right now!");
-      }
     } catch (const std::runtime_error &e) {
       ROS_ERROR_STREAM("error parsing cameras: " << e.what());
       ros::shutdown();
@@ -104,24 +104,35 @@ namespace multicam_calibration {
 
   void CalibrationNodelet::parseCameras() {
     ros::NodeHandle nh = getPrivateNodeHandle();
-    std::vector<std::string> camNames = {"cam0", "cam1", "cam2"};
-    for (const auto &cam : camNames) {
+    //std::vector<std::string> camNames = {"cam0", "cam1", "cam2"};    
+    //for (const auto &cam : camNames) {
+    bool done = false;
+    int cam_index = 0; 
+    while (!done) {
+      std::string cam = "cam" + std::to_string(cam_index);
       XmlRpc::XmlRpcValue lines;
       if (!nh.getParam(cam, lines)) {
-        continue;
+        done = true;
+        break;
       }
+      ROS_INFO_STREAM("Parsing " << cam);
       CalibrationData calibData;
       calibData.name = cam;
       CameraIntrinsics &ci = calibData.intrinsics;
+      // if (!nh.getParam(cam + "/distortion_coeffs",
+      //                  ci.distortion_coeffs)) { bombout("distortion_coeffs", cam); }
+      // if (!nh.getParam(cam + "/intrinsics",  ci.intrinsics)) { bombout("intrinsics", cam); }
+      // if (!nh.getParam(cam + "/resolution",  ci.resolution)) { bombout("resolution", cam); }
+      if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
       if (!nh.getParam(cam + "/camera_model",
                        ci.camera_model)) { bombout("camera_model", cam); }
       if (!nh.getParam(cam + "/distortion_model",
                        ci.distortion_model)) { bombout("distortion_model", cam); }
-      if (!nh.getParam(cam + "/distortion_coeffs",
-                       ci.distortion_coeffs)) { bombout("distortion_coeffs", cam); }
-      if (!nh.getParam(cam + "/intrinsics",  ci.intrinsics)) { bombout("intrinsics", cam); }
-      if (!nh.getParam(cam + "/resolution",  ci.resolution)) { bombout("resolution", cam); }
-      if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
+
+      // estimate the intrinsics automatically
+      ROS_INFO_STREAM("Collecting samples for intrinsics estimation...");
+      estimate_intrinsics(nh, 25, calibData);
+      
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
       cameras_.push_back(calibData);
@@ -129,7 +140,10 @@ namespace multicam_calibration {
       imagePoints_.push_back(CamImagePoints());
       calibrator_->addCamera(cam, calibData);
       ROS_INFO_STREAM("added camera: " << cam);
+      cam_index++;
     }
+    ROS_INFO_STREAM("Found " << cameras_.size() << " cameras! Moving on...");
+    cameras_ready_ = true;
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
 
@@ -254,6 +268,7 @@ namespace multicam_calibration {
           for (unsigned int cam2_idx = cam_idx; cam2_idx < results.size(); cam2_idx++) {
             CamErr &ce = cam_error[cam2_idx];
             const CalibrationData &cam2 = results[cam2_idx];
+            //T_c2_c1 = (cam2_idx == cam_idx) ? identity() : cam2.T_cn_cnm1 * T_c2_c1; // forward the chain
             T_c2_c1 = (cam2_idx == cam_idx) ? identity() : cam2.T_cn_cnm1 * T_c2_c1; // forward the chain
             CameraExtrinsics T_c2_world = T_c2_c1 * T_c1_world;
             const auto &wpts2 = worldPoints_[cam2_idx][frame];
@@ -269,14 +284,21 @@ namespace multicam_calibration {
                                             ci2.distortion_model, ci2.distortion_coeffs,
                                             &ipts2proj);
               double e(0);
+              int count = 0;
               for (unsigned int i = 0; i < ipts2.size(); i++) {
+                if (ipts2[i].x < 0 || ipts2proj[i].x < 0 ||
+                    ipts2[i].y < 0 || ipts2proj[i].y < 0 ||
+                    ipts2[i].x >= ci.resolution[0] || ipts2proj[i].x >= ci2.resolution[0] ||
+                    ipts2[i].y >= ci.resolution[1] || ipts2proj[i].y >= ci2.resolution[1])
+                  continue;
                 double dx = (ipts2[i].x - ipts2proj[i].x);
                 double dy = (ipts2[i].y - ipts2proj[i].y);
                 e += dx*dx + dy*dy;
+                count++;
               }
-              double epp = sqrt(e/(double)ipts2.size()); // per pixel error
+              double epp = sqrt(e/(double)count); // per pixel error
               ce.errSum += e;
-              ce.cnt    += ipts2.size();
+              ce.cnt    += count;
               if (epp > 10.0) {
                 ROS_WARN_STREAM("frame " << frame << " tested between cams " << cam_idx
                                 << " and " << cam2_idx << " has high pixel err: " << epp);
@@ -355,7 +377,7 @@ namespace multicam_calibration {
       print_tf(os, "  ", T_imu_body_);
     }
   }
-
+  
   void CalibrationNodelet::subscribe() {
     switch (sub_.size()) {
     case 0:
@@ -380,17 +402,31 @@ namespace multicam_calibration {
         sync3_->registerCallback(&CalibrationNodelet::callback3, this);
       }
       break;
+    case 4:
+      if (use_approximate_sync_) {
+        approx_sync4_.reset(new ApproxTimeSynchronizer4(
+                              ApproxSyncPolicy4(60/*q size*/),
+                              *(sub_[0]), *(sub_[1]), *(sub_[2]), *(sub_[3])));
+        approx_sync4_->registerCallback(&CalibrationNodelet::callback4, this);
+      } else {
+        ROS_ERROR("No exact sync beyond 3 cameras, right now");
+      }
+      break;
     default:
       ROS_ERROR("invalid number of subscribers!");
     }
   }
 
-  bool CalibrationNodelet::guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *T_0_w) const {
-    CameraExtrinsics T_n_0 = identity();
+  bool CalibrationNodelet::guessCameraPose(const CamWorldPoints &wp,
+                                           const CamImagePoints &ip,                                           
+                                           CameraExtrinsicsVec& T_board,
+                                           bool estimate_transform)  {
+    using utils::operator*;
+    CameraExtrinsics T_n = identity();
     bool poseFound(false);
     for (unsigned int cam_idx = 0; cam_idx < cameras_.size(); cam_idx++) {
-      const CalibrationData &cd = cameras_[cam_idx];
-      T_n_0 = cd.T_cn_cnm1 * T_n_0; // chain forward from cam0 to current camera
+      CalibrationData &cd = cameras_[cam_idx];
+      T_n = cd.T_cn_cnm1 * T_n; // chain forward from cam0 to current camera
       if (!wp[cam_idx].empty()) {
         const CameraIntrinsics &ci = cd.intrinsics;
         CameraExtrinsics T_n_w = get_init_pose::get_init_pose(wp[cam_idx], ip[cam_idx], ci.intrinsics,
@@ -398,18 +434,35 @@ namespace multicam_calibration {
         //std::cout << cam_idx << " init pose: " << std::endl << T_n_w << std::endl;
         if (!poseFound) {
           // first camera with valid pose found
-          *T_0_w = T_n_0.inverse() * T_n_w;
+          T_board.push_back(T_n_w);
           poseFound = true;
         } else {
-          // XXX issue warning if error is too big!
-          CameraExtrinsics T_0_w_test = T_n_0.inverse() * T_n_w;
-          CameraExtrinsics T_err = T_0_w_test.inverse() * (*T_0_w);
-          double rot_err = 1.5 - 0.5 *(T_err(0,0) + T_err(1,1) + T_err(2,2));
-          if (rot_err > 0.25) {
-            ROS_WARN_STREAM("init tf for camera " << cam_idx << " is off from your initial .yaml file!");
-            ROS_WARN_STREAM("expected T_n_0 from " << cam_idx << " to cam 0 is roughly:");
-            ROS_WARN_STREAM(T_n_w * T_0_w->inverse());
+          T_board.push_back(T_n_w);
+          if (estimate_transform) {
+            CameraExtrinsics& T_nm1_w = T_board[cam_idx-1];
+            CameraExtrinsics T_cn_cnm1_est = T_nm1_w.inverse() * T_n_w;
+
+            std::vector<double> tcn = utils::transform_to_rvec_tvec(cd.T_cn_cnm1);
+            std::vector<double> rtvec = utils::transform_to_rvec_tvec(T_cn_cnm1_est);
+            std::vector<double> tcn_adj = tcn * 0.9;
+            std::vector<double> rtvec_adj = rtvec * 0.1;
+            CameraExtrinsics T0, T1;
+            utils::rvec_tvec_to_transform(tcn * 0.9, T0);
+            utils::rvec_tvec_to_transform(rtvec * 0.1, T1);
+            cd.T_cn_cnm1 = T0 * T1;
           }
+          // XXX issue warning if error is too big!
+          //
+          // Not sure what this is for, since we don't want to have accurate estimates!
+          // 
+          // CameraExtrinsics T_0_w_test = T_n_0.inverse() * T_n_w;
+          // CameraExtrinsics T_err = T_0_w_test.inverse() * (*T_0_w);
+          // double rot_err = 1.5 - 0.5 *(T_err(0,0) + T_err(1,1) + T_err(2,2));
+          // if (rot_err > 0.25) {
+          //   ROS_WARN_STREAM("init tf for camera " << cam_idx << " is off from your initial .yaml file!");
+          //   ROS_WARN_STREAM("expected T_n_0 from " << cam_idx << " to cam 0 is roughly:");
+          //   ROS_WARN_STREAM(T_n_w * T_0_w->inverse());
+          // }
           //std::cout << "T_err: " << std::endl << T_err << std::endl;
           //double trans_err = T_err.block<3,1>(0,3).norm();//std::abs(T_err(3,0)) +std::abs(T_err(3,1)) +std::abs(T_err(3,2))
           //std::cout << "rot error: " << rot_err << " trans error: " << trans_err <<std::endl;
@@ -512,12 +565,12 @@ namespace multicam_calibration {
         wp.push_back(worldPoints_[camid][fnum]);
         ip.push_back(imagePoints_[camid][fnum]);
       }
-      CameraExtrinsics cam0Pose;
-      if (!guessCameraPose(wp, ip, &cam0Pose)) {
+      CameraExtrinsicsVec camPoses;
+      if (!guessCameraPose(wp, ip, camPoses)) {
         ROS_WARN_STREAM("no detections found, skipping frame " << fnum);
         continue;
       }
-      calibrator_->addPoints(frameNum_, wp, ip, cam0Pose);
+      calibrator_->addPoints(frameNum_, wp, ip, camPoses);
     }
     return (true);
   }
@@ -534,12 +587,12 @@ namespace multicam_calibration {
     // Insert newly detected points into existing set.
     // At this point one could add the data points to an
     // incremental solver.
-    CameraExtrinsics cam0Pose;
-    if (!guessCameraPose(wp, ip, &cam0Pose)) {
+    CameraExtrinsicsVec camPoses;
+    if (!guessCameraPose(wp, ip, camPoses, true)) {
       ROS_WARN("no detections found, skipping frame!");
       return;
     }
-    calibrator_->addPoints(frameNum_, wp, ip, cam0Pose);
+    calibrator_->addPoints(frameNum_, wp, ip, camPoses);
 
     // add new frames to each camera
     for (unsigned int cam_idx = 0; cam_idx < wp.size(); cam_idx++) {
@@ -602,20 +655,40 @@ namespace multicam_calibration {
     }
   }
 
-  
+
   void CalibrationNodelet::callback1(ImageConstPtr const &img0) {
     std::vector<ImageMsg::ConstPtr> msg_vec = {img0};
     process(msg_vec);
   }
-
+  
   void CalibrationNodelet::callback2(ImageConstPtr const &img0, ImageConstPtr const &img1) {
     std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1};
     process(msg_vec);
   }
-
+  
   void CalibrationNodelet::callback3(ImageConstPtr const &img0, ImageConstPtr const &img1,
                                      ImageConstPtr const &img2) {
     std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2};
     process(msg_vec);
   }
+  void CalibrationNodelet::callback4(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback5(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback6(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4, ImageConstPtr const &img5) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4, img5};
+    process(msg_vec);
+  }
+
 }

@@ -38,7 +38,7 @@ namespace multicam_calibration {
       return Mat<T, 3, 3>(Eigen::AngleAxis<T>(angle, axis));
     }
 
-    std::string vec_to_str(const double *p, int len) {
+    inline std::string vec_to_str(const double *p, int len) {
       std::stringstream ss;
       if(len > 0)  {
         ss << std::fixed << std::setw(9) << std::setprecision(5) << p[0];
@@ -49,7 +49,7 @@ namespace multicam_calibration {
       return (ss.str());
     }
 
-    std::string pose_to_str(const Pose &pose) {
+    inline std::string pose_to_str(const Pose &pose) {
       Vec<double, 3> rvec = {pose.first.x, pose.first.y, pose.first.z};
       Mat<double, 3, 3> rmat = rotation_matrix(rvec);
       double p[12] = {rmat(0,0), rmat(0,1), rmat(0,2),
@@ -149,6 +149,103 @@ namespace multicam_calibration {
         }
       return projected_points;
     }
+
+    inline std::vector<double>
+    transform_to_rvec_tvec(const CameraExtrinsics &tf) {
+      std::vector<double> v;
+      Eigen::AngleAxisd axisAngle(tf.block<3,3>(0, 0));
+      Eigen::Vector3d rvec = axisAngle.axis() * axisAngle.angle();
+      v.push_back(rvec(0));
+      v.push_back(rvec(1));
+      v.push_back(rvec(2));
+      // Translation
+      Eigen::Vector3d T = tf.block<3,1>(0, 3);
+      v.push_back(T(0));
+      v.push_back(T(1));
+      v.push_back(T(2));
+      return (v);
+    }
+
+    inline void
+    rvec_tvec_to_transform(const std::vector<double>& rvec_tvec, CameraExtrinsics& ext)
+    {
+      const Vec<double,3> rvec = Eigen::Map<const Vec<double,3>>(&rvec_tvec[0]);
+      const Vec<double,3> tvec = Eigen::Map<const Vec<double,3>>(&rvec_tvec[3]);
+      Mat<double,3,3> R = rotation_matrix(rvec);
+      ext = zeros();
+      ext.block<3,3>(0,0) = R;
+      ext.block<3,1>(0,3) = tvec;
+      ext(3,3) = 1.0;      
+    }
+
+    inline std::vector<double>
+    operator*(const std::vector<double>& v, double s)
+    {
+      std::vector<double> rv;
+      for (double d : v) {
+        rv.push_back(d * s);
+      }
+      return rv;
+    }
+    
+    inline unsigned int
+    get_extrinsics_base(const CalibDataVec &cdv) {
+      unsigned int extrinsicsBase(0);
+      for (const auto &cd : cdv) {
+        // for each camera we have fx, fy, cx, cy + distortion coefficients;
+        extrinsicsBase += cd.intrinsics.intrinsics.size() + cd.intrinsics.distortion_coeffs.size();
+      }
+      return (extrinsicsBase);
+    }
+
+    
+#ifdef DEBUG_PARAMS  
+    inline void print_params(const std::vector<double> &p, const CalibDataVec &cams) {
+      
+      using utils::rotation_matrix;
+      using utils::vec_to_str;
+      int off(0);
+      std::cout << "------------------- parameters: -------------------" << std::endl;
+      unsigned int intrinsics_offset(0);
+      unsigned int extrinsics_base = get_extrinsics_base(cams);
+      for(const auto cam_idx : boost::irange(0u, (unsigned int)cams.size())) {
+        const CalibrationData &cam = cams[cam_idx];
+        unsigned int off = intrinsics_offset;
+        std::cout << "--------- camera # " << cam_idx << std::endl;
+        std::cout << "fx: " << p[off]   << " fy: " << p[off+1] << std::endl;
+        std::cout << "cx: " << p[off+2] << " cy: " << p[off+3] << std::endl;
+        std::cout << "distortion coeff:";
+        for(const auto k : boost::irange(0u, (unsigned int)cam.intrinsics.distortion_coeffs.size())) {
+          std::cout << " " << p[off + cam.intrinsics.intrinsics.size() + k];
+        }
+        std::cout << std::endl;
+        if (cam_idx > 0) {
+          off = extrinsics_base + 6 * (cam_idx - 1);
+          const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
+          Mat<double, 3, 3> R = rotation_matrix(rvec);
+          const Vec<double, 3> t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
+          std::cout << "T_cam_cam0:  rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
+                    << vec_to_str(&t(0), 3) << "]" << std::endl;
+        }
+        intrinsics_offset += cam.intrinsics.intrinsics.size() +
+          cam.intrinsics.distortion_coeffs.size();
+
+      }
+      off = extrinsics_base + 6 * (cams.size() - 1);
+      std::cout << "--------- camera poses ----------------" << std::endl;
+      for (; off < (int)p.size(); off += 6) {
+#if 0
+        const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
+        Mat<double, 3, 3> R = rotation_matrix(rvec);
+        const Vec<double, 3> t  = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
+        std::cout << "rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
+                  << vec_to_str(&t(0), 3) << "]" << std::endl;
+#endif      
+      }
+    }
+#endif
+
+    
   }
 }
 

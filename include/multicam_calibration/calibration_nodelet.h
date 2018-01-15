@@ -26,8 +26,21 @@ namespace multicam_calibration {
   using ImageMsg = sensor_msgs::Image;
   typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg> ApproxSyncPolicy2;
   typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg> ApproxSyncPolicy3;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg> ApproxSyncPolicy4;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg,ImageMsg> ApproxSyncPolicy5;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg,ImageMsg,ImageMsg> ApproxSyncPolicy6;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg> ApproxSyncPolicy7;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg> ApproxSyncPolicy8;
+  typedef message_filters::sync_policies::ApproximateTime<ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg, ImageMsg> ApproxSyncPolicy9;
+
   typedef message_filters::Synchronizer<ApproxSyncPolicy2> ApproxTimeSynchronizer2;
   typedef message_filters::Synchronizer<ApproxSyncPolicy3> ApproxTimeSynchronizer3;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy4> ApproxTimeSynchronizer4;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy5> ApproxTimeSynchronizer5;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy6> ApproxTimeSynchronizer6;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy7> ApproxTimeSynchronizer7;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy8> ApproxTimeSynchronizer8;
+  typedef message_filters::Synchronizer<ApproxSyncPolicy9> ApproxTimeSynchronizer9;
   typedef message_filters::TimeSynchronizer<ImageMsg, ImageMsg> ExactSynchronizer2;
   typedef message_filters::TimeSynchronizer<ImageMsg, ImageMsg, ImageMsg> ExactSynchronizer3;
   class CalibrationNodelet : public nodelet::Nodelet {
@@ -40,13 +53,16 @@ namespace multicam_calibration {
     void callback1(ImageConstPtr const &img0);
     void callback2(ImageConstPtr const &img0, ImageConstPtr const &img1);
     void callback3(ImageConstPtr const &img0, ImageConstPtr const &img1, ImageConstPtr const &img2);
+    void callback4(ImageConstPtr const &img0, ImageConstPtr const &img1, ImageConstPtr const &img2, ImageConstPtr const &img3);
+    void callback5(ImageConstPtr const &img0, ImageConstPtr const &img1, ImageConstPtr const &img2, ImageConstPtr const &img3, ImageConstPtr const &img4);
+    void callback6(ImageConstPtr const &img0, ImageConstPtr const &img1, ImageConstPtr const &img2, ImageConstPtr const &img3, ImageConstPtr const &img4, ImageConstPtr const &img5);
     void process(const std::vector<ImageConstPtr> &msg_vec);
     void subscribe();
     void parseCameras();
     void publishDebugImages(const std::vector<ImageConstPtr> &msg_vec,
                             const std::vector<apriltag_ros::ApriltagVec> &detected_tags);
     void publishTagCounts();
-    bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf) const;
+    bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsicsVec& cam0tf, bool estimate_transform=false) ;
     void writeCalibration(std::ostream &os, const CalibDataVec &results);
     void homographyTest(const CalibDataVec &results) const;
     void testCalibration();
@@ -58,6 +74,12 @@ namespace multicam_calibration {
     std::vector<ros::Publisher> tagCountPub_;
     std::unique_ptr<ApproxTimeSynchronizer2> approx_sync2_;
     std::unique_ptr<ApproxTimeSynchronizer3> approx_sync3_;
+    std::unique_ptr<ApproxTimeSynchronizer4> approx_sync4_;
+    std::unique_ptr<ApproxTimeSynchronizer5> approx_sync5_;
+    std::unique_ptr<ApproxTimeSynchronizer6> approx_sync6_;
+    std::unique_ptr<ApproxTimeSynchronizer7> approx_sync7_;
+    std::unique_ptr<ApproxTimeSynchronizer8> approx_sync8_;
+    std::unique_ptr<ApproxTimeSynchronizer9> approx_sync9_;
     std::unique_ptr<ExactSynchronizer2> sync2_;
     std::unique_ptr<ExactSynchronizer3> sync3_;
     std::unique_ptr<Calibrator> calibrator_;
@@ -71,9 +93,13 @@ namespace multicam_calibration {
     int frameNum_{0};
     int skipCount_{0};
     int skipFrames_{1};
+    bool cameras_ready_;
+    
   };
 }
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(multicam_calibration::CalibrationNodelet, nodelet::Nodelet)
+
+#define ASYNC(id)
 
 #endif

@@ -2,8 +2,10 @@
  * 2017 Bernd Pfrommer bernd.pfrommer@gmail.com
  *      Kartik Mohta
  */
-#include "multicam_calibration/calibrator.h"
-#include "multicam_calibration/utils.h"
+
+#include <multicam_calibration/frame_residual.h>
+#include <multicam_calibration/calibrator.h>
+#include <multicam_calibration/utils.h>
 #include <ceres/ceres.h>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <boost/range/irange.hpp>
@@ -22,160 +24,6 @@ namespace multicam_calibration {
   using utils::rotation_matrix;
   using boost::irange;
   
-  static unsigned int get_extrinsics_base(const CalibDataVec &cdv) {
-    unsigned int extrinsicsBase(0);
-    for (const auto &cd : cdv) {
-      // for each camera we have fx, fy, cx, cy + distortion coefficients;
-      extrinsicsBase += cd.intrinsics.intrinsics.size() + cd.intrinsics.distortion_coeffs.size();
-    }
-    return (extrinsicsBase);
-  }
-
-  struct FrameResidual
-  {
-    // Input is the list of world points and image points for the current frame in
-    // each of the cameras
-    FrameResidual(const std::vector<FrameWorldPoints> &world_points,
-                  const std::vector<FrameImagePoints> &image_points,
-                  const CalibDataVec &cams, unsigned int ext_base_off) :
-      world_points_(world_points), image_points_(image_points), cams_(cams),
-        extrinsics_base_offset_(ext_base_off)
-      {
-      }
-
-    template <typename T>
-    bool operator()(T const *const *params, T *residual) const
-      {
-        const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[1][0]);
-        const Mat<T, 3, 3>  R_frame = rotation_matrix(R_vec_frame);
-        const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[1][3]);
-
-        unsigned int residual_count = 0;
-        unsigned int intrinsics_offset = 0;
-        for(const auto cam_idx : irange(0u, (unsigned int)cams_.size()))
-          {
-            const CalibrationData &cam = cams_[cam_idx];
-            Mat<T, 3, 3> K = Mat<T, 3, 3>::Identity();
-            K(0, 0) = params[0][intrinsics_offset];
-            K(1, 1) = params[0][intrinsics_offset + 1];
-            K(0, 2) = params[0][intrinsics_offset + 2];
-            K(1, 2) = params[0][intrinsics_offset + 3];
-            unsigned int numDist = cam.intrinsics.distortion_coeffs.size();
-            DynVec<T> D(numDist);
-            for(const auto i : irange(0u, numDist)) {
-              D(i) = params[0][intrinsics_offset +
-                               cam.intrinsics.intrinsics.size() + i];
-            }
-                  
-            Mat<T, 3, 3> R_cam;
-            Vec<T, 3> t_cam;
-            if(cam_idx == 0)
-              {
-                R_cam = Mat<T, 3, 3>::Identity();
-                t_cam = Vec<T, 3>::Zero();
-              }
-            else
-              {
-                const auto extrinsic_start_idx = extrinsics_base_offset_ + 6 * (cam_idx - 1);
-                const Vec<T, 3> R_vec_cam =
-                  Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx]);
-                //std::cout << "rvec: " << R_vec_cam(0, 0) << " " << R_vec_cam(1,0) << " " << R_vec_cam(2,0) << std::endl;
-                R_cam = rotation_matrix(R_vec_cam); // rotation vector
-                t_cam = 
-                  Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx + 3]);
-              }
-                  
-            const Mat<T, 3, 3> R = R_cam * R_frame;
-            const Vec<T, 3> t = R_cam * t_frame + t_cam;
-            std::vector<Point2<T>> projected_points;
-            if (cam.intrinsics.distortion_model == "equidistant") {
-              projected_points = utils::project_frame_equidistant(world_points_[cam_idx], R, t, K, D);
-            } else if (cam.intrinsics.distortion_model == "radtan") {
-              projected_points = utils::project_frame_radtan(world_points_[cam_idx], R, t, K, D);
-            } else {
-              std::cout << "ERROR: unknown distortion model: " << cam.intrinsics.distortion_model << std::endl;
-              return (false);
-            }
-            for(const auto i : irange<size_t>(0, projected_points.size()))
-              {
-                residual[residual_count++] =
-                  projected_points[i].x - T(image_points_[cam_idx][i].x);
-                residual[residual_count++] =
-                  projected_points[i].y - T(image_points_[cam_idx][i].y);
-              }
-            intrinsics_offset += cam.intrinsics.intrinsics.size() +
-              cam.intrinsics.distortion_coeffs.size();
-          }
-        return true;
-      }
-
-  private:
-    const std::vector<FrameWorldPoints> world_points_;
-    const std::vector<FrameImagePoints> image_points_;
-    CalibDataVec cams_;
-    unsigned int extrinsics_base_offset_;
-  };
-
-  static std::vector<double> transform_to_rvec_tvec(const CameraExtrinsics &tf) {
-    std::vector<double> v;
-    Eigen::AngleAxisd axisAngle(tf.block<3,3>(0, 0));
-    Eigen::Vector3d rvec = axisAngle.axis() * axisAngle.angle();
-    v.push_back(rvec(0));
-    v.push_back(rvec(1));
-    v.push_back(rvec(2));
-    // Translation
-    Eigen::Vector3d T = tf.block<3,1>(0, 3);
-    v.push_back(T(0));
-    v.push_back(T(1));
-    v.push_back(T(2));
-    return (v);
-  }
-
-#ifdef DEBUG_PARAMS  
-  static void print_params(const std::vector<double> &p, const CalibDataVec &cams) {
-    using utils::rotation_matrix;
-    using utils::vec_to_str;
-    int off(0);
-    std::cout << "------------------- parameters: -------------------" << std::endl;
-    unsigned int intrinsics_offset(0);
-    unsigned int extrinsics_base = get_extrinsics_base(cams);
-    for(const auto cam_idx : irange(0u, (unsigned int)cams.size())) {
-      const CalibrationData &cam = cams[cam_idx];
-      unsigned int off = intrinsics_offset;
-      std::cout << "--------- camera # " << cam_idx << std::endl;
-      std::cout << "fx: " << p[off]   << " fy: " << p[off+1] << std::endl;
-      std::cout << "cx: " << p[off+2] << " cy: " << p[off+3] << std::endl;
-      std::cout << "distortion coeff:";
-      for(const auto k : irange(0u, (unsigned int)cam.intrinsics.distortion_coeffs.size())) {
-        std::cout << " " << p[off + cam.intrinsics.intrinsics.size() + k];
-      }
-      std::cout << std::endl;
-      if (cam_idx > 0) {
-        off = extrinsics_base + 6 * (cam_idx - 1);
-        const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
-        Mat<double, 3, 3> R = rotation_matrix(rvec);
-        const Vec<double, 3> t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
-        std::cout << "T_cam_cam0:  rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
-             << vec_to_str(&t(0), 3) << "]" << std::endl;
-      }
-      intrinsics_offset += cam.intrinsics.intrinsics.size() +
-        cam.intrinsics.distortion_coeffs.size();
-
-    }
-    off = extrinsics_base + 6 * (cams.size() - 1);
-    std::cout << "--------- camera poses ----------------" << std::endl;
-    for (; off < (int)p.size(); off += 6) {
-#if 0
-      const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
-      Mat<double, 3, 3> R = rotation_matrix(rvec);
-      const Vec<double, 3> t  = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
-      std::cout << "rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
-                << vec_to_str(&t(0), 3) << "]" << std::endl;
-#endif      
-    }
-  }
-#endif
-
   void Calibrator::addCamera(const std::string &name,
                              const CalibrationData &calibData) {
     calibrationData_.push_back(calibData);
@@ -183,8 +31,9 @@ namespace multicam_calibration {
     imagePoints_.resize(calibrationData_.size());
   }
 
-  void Calibrator::addPoints(int frameNum, const CamWorldPoints &wp, const CamImagePoints &ip,
-                             const CameraExtrinsics &cam0PoseGuess) {
+  void Calibrator::addPoints(int frameNum, const CamWorldPoints &wp,
+                             const CamImagePoints &ip,
+                             const CameraExtrinsicsVec &camPoseGuess) {
     if (wp.size() != calibrationData_.size() ||
         ip.size() != calibrationData_.size()) {
       std::cerr << "number of cams != width of array!" << std::endl;
@@ -196,7 +45,7 @@ namespace multicam_calibration {
       FrameImagePoints fip(ip[cam_idx].begin(), ip[cam_idx].end());
       imagePoints_[cam_idx].push_back(fip);
     }
-    cam0PoseGuess_.push_back(cam0PoseGuess);
+    camPoseGuess_.push_back(camPoseGuess);
   }
 
   void Calibrator::initializeVariables(std::vector<double> *param_ptr) {
@@ -214,7 +63,7 @@ namespace multicam_calibration {
     // initialize T_cn_cnm1, only for cameras > 0
     for(const auto cam_idx : irange(1u, num_cameras)) {
       // ------------ relative to camera 0 -----------------
-      std::vector<double> rvec_tvec = transform_to_rvec_tvec(calibrationData_[cam_idx].T_cn_cnm1);
+      std::vector<double> rvec_tvec = utils::transform_to_rvec_tvec(calibrationData_[cam_idx].T_cn_cnm1);
       params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
     }
     // the number of frames are the same across all cameras,
@@ -222,11 +71,14 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     // initialize pose guess for camera 0
     for(const auto i : irange(0u, num_frames))  {
-      std::vector<double> rvec_tvec = transform_to_rvec_tvec(cam0PoseGuess_[i]);
-      params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
+      for (size_t j = 0; j < num_cameras-1; ++j) {
+        // add cam pose guess for cameras 0-(n-2) for each frame
+        std::vector<double> rvec_tvec = utils::transform_to_rvec_tvec(camPoseGuess_[i][j]);
+        params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
+      }
     };
 #ifdef DEBUG_PARAMS    
-    print_params(params, calibrationData_);
+    utils::print_params(params, calibrationData_);
 #endif
   }
 
@@ -252,7 +104,7 @@ namespace multicam_calibration {
     ceres::Solve(options, &problem, &summary);
 
 #ifdef DEBUG_PARAMS
-    print_params(params_, calibrationData_);
+    utils::print_params(params_, calibrationData_);
 #endif
     std::cout << summary.FullReport() << std::endl;
   }
@@ -262,7 +114,7 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    unsigned int extrinsicsBase = utils::get_extrinsics_base(calibrationData_);
     // add the extrinsics between cam0 and the rest
     unsigned int totNumCameraParams = extrinsicsBase + 6 * (num_cameras - 1);
     
@@ -280,7 +132,7 @@ namespace multicam_calibration {
       const unsigned numResiduals = 2 * frame_num_points;
       std::vector<double> residuals(numResiduals);
       // point offset to cam0 pose for this particular frame
-      const auto R_vec_offset = totNumCameraParams + 6 * fnum;
+      const auto R_vec_offset = totNumCameraParams + 6 * (num_cameras-1) * fnum;
       double const * const params[2] = {&params_[0], &params_[R_vec_offset]};
       // compute residuals
       fr(params, residuals.data());
@@ -304,7 +156,7 @@ namespace multicam_calibration {
     const std::vector<double> &p = params_;
     
     CameraExtrinsics T_cn_cam0 = identity();
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    unsigned int extrinsicsBase = utils::get_extrinsics_base(calibrationData_);
     unsigned int intrinsics_offset = 0;
 
     for (unsigned int cam_idx = 0; cam_idx < calibrationData_.size(); cam_idx++) {
@@ -314,7 +166,7 @@ namespace multicam_calibration {
         const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
         Mat<double, 3, 3>       R = rotation_matrix(rvec);
         const Vec<double, 3>    t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
-        CameraExtrinsics T_cn_cnm1;
+        CameraExtrinsics T_cn_cnm1 = zeros();
 
         T_cn_cnm1.block<3,3>(0, 0) = R;
         T_cn_cnm1.block<3,1>(0, 3) = t;
@@ -349,7 +201,7 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    unsigned int extrinsicsBase = utils::get_extrinsics_base(calibrationData_);
     // add the extrinsics between cam0 and the rest
     unsigned int totNumCameraParams = extrinsicsBase + 6 * (num_cameras - 1);
 
@@ -372,11 +224,11 @@ namespace multicam_calibration {
       // Per camera intrinsics + (ncam-1) extrinsics
       cost_function->AddParameterBlock(totNumCameraParams);
       // Pose of cam0 wrt calib board
-      cost_function->AddParameterBlock(6);
+      cost_function->AddParameterBlock(6 * (num_cameras-1));
        // Reprojection error
       cost_function->SetNumResiduals(2 * frame_num_points);
       // point offset to cam0 pose for this particular frame
-      const auto R_vec_offset = totNumCameraParams + 6 * i;
+      const auto R_vec_offset = totNumCameraParams + 6 * i * (num_cameras-1);
       problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0),
                                &params[0], &params[R_vec_offset]);
       //problem.SetParameterBlockConstant(&params[0]);

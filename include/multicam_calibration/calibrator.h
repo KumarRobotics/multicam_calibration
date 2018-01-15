@@ -22,7 +22,7 @@ namespace multicam_calibration {
     void addCamera(const std::string &name,
                    const CalibrationData &calibData);
     void addPoints(int frameNum, const CamWorldPoints &wp, const CamImagePoints &ip,
-                   const CameraExtrinsics &cam0InitPose);
+                   const CameraExtrinsicsVec &cam0InitPose);
     void runCalibration();
     CalibDataVec getCalibrationResults() const;
     // returns residuals[frame_num][cam_idx][point_idx]
@@ -36,7 +36,7 @@ namespace multicam_calibration {
     CalibDataVec                  calibrationData_;
     std::vector<CamWorldPoints>   worldPoints_;
     std::vector<CamImagePoints>   imagePoints_;
-    CameraExtrinsicsVec           cam0PoseGuess_; // initial pose guess cam0, one per frame
+    CameraExtrinsicsVecVec        camPoseGuess_; // initial pose guess cam0, one per frame
     std::vector<double>           params_; // all the parameters that need to be optimized
   };
 }

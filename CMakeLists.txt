@@ -10,7 +10,7 @@ find_package(Ceres REQUIRED)
 
 catkin_simple()
 
-cs_add_library(calibration_nodelet src/calibration_nodelet.cpp src/multicam_apriltag_detector.cpp src/calibrator.cpp src/camera_extrinsics.cpp src/calibration_data.cpp src/get_init_pose.cpp src/camera_intrinsics.cpp)
+cs_add_library(calibration_nodelet src/calibration_nodelet.cpp src/multicam_apriltag_detector.cpp src/calibrator.cpp src/camera_extrinsics.cpp src/calibration_data.cpp src/get_init_pose.cpp src/camera_intrinsics.cpp src/intrinsic_estimator.cpp)
 target_link_libraries(calibration_nodelet ${CATKIN_LIBRARIES} ${CERES_LIBRARIES})
 
 cs_add_library(calibration_test_nodelet src/calibration_test_nodelet.cpp src/multicam_apriltag_detector.cpp src/camera_extrinsics.cpp src/calibration_data.cpp src/get_init_pose.cpp src/camera_intrinsics.cpp)

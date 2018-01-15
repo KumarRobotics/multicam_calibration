@@ -15,5 +15,6 @@ namespace multicam_calibration {
   CameraExtrinsics identity();
   bool isNonZero(const CameraExtrinsics &T);
   typedef std::vector<CameraExtrinsics, Eigen::aligned_allocator<CameraExtrinsics> > CameraExtrinsicsVec;
+  typedef std::vector<CameraExtrinsicsVec, Eigen::aligned_allocator<CameraExtrinsicsVec>> CameraExtrinsicsVecVec;
 }
 #endif
