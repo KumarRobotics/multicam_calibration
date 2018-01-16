@@ -126,6 +126,20 @@ namespace multicam_calibration {
       if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
+      if (cam_index == 0) {
+        if (calibData.T_cn_cnm1 != identity()) {
+          ROS_WARN_STREAM("Cam0 had a non-identity T_cn_cnm1 specified!");
+          calibData.T_cn_cnm1 = identity();
+        }
+      } else {
+        Eigen::Matrix<double,3,3> R = calibData.T_cn_cnm1.block<3,3>(0,0);
+        Eigen::Matrix<double,3,3> I = Eigen::Matrix<double,3,3>::Identity();
+        if (R == I) {
+          ROS_ERROR_STREAM(cam << " cannot have an identity rotation in T_cn_cnm1. Perturb values as needed.");
+          Eigen::AngleAxisd a(0.00001,Eigen::Vector3d::UnitX());
+          calibData.T_cn_cnm1.block<3,3>(0,0) = a.toRotationMatrix();
+        }
+      }
       cameras_.push_back(calibData);
       worldPoints_.push_back(CamWorldPoints());
       imagePoints_.push_back(CamImagePoints());
