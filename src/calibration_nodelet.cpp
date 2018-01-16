@@ -469,7 +469,7 @@ namespace multicam_calibration {
         img_pts[frame_count - 1].emplace_back(cam_x, cam_y);
       }
     in.close();
-    printf("Got data for %u frames\n", frame_count);
+    printf("read %u frames from corners file for cam %u\n", frame_count, camera_id);
     return true;
   }
 
