@@ -19,6 +19,7 @@ namespace multicam_calibration {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     using Vec2d = Eigen::Matrix<double, 2, 1>;
     using Residuals = std::vector<std::vector<std::vector<Vec2d>>>;
+    void setFixIntrinsics(bool f) { fixIntrinsics_ = f; }
     void addCamera(const std::string &name,
                    const CalibrationData &calibData);
     void addPoints(int frameNum, const CamWorldPoints &wp, const CamImagePoints &ip,
@@ -38,6 +39,7 @@ namespace multicam_calibration {
     std::vector<CamImagePoints>   imagePoints_;
     CameraExtrinsicsVec           cam0PoseGuess_; // initial pose guess cam0, one per frame
     std::vector<double>           params_; // all the parameters that need to be optimized
+    bool                          fixIntrinsics_{false};
   };
 }
 #endif

@@ -22,7 +22,7 @@ namespace multicam_calibration {
   using utils::rotation_matrix;
   using boost::irange;
   
-  static unsigned int get_extrinsics_base(const CalibDataVec &cdv) {
+  static unsigned int get_num_intrinsics(const CalibDataVec &cdv) {
     unsigned int extrinsicsBase(0);
     for (const auto &cd : cdv) {
       // for each camera we have fx, fy, cx, cy + distortion coefficients;
@@ -37,18 +37,18 @@ namespace multicam_calibration {
     // each of the cameras
     FrameResidual(const std::vector<FrameWorldPoints> &world_points,
                   const std::vector<FrameImagePoints> &image_points,
-                  const CalibDataVec &cams, unsigned int ext_base_off) :
-      world_points_(world_points), image_points_(image_points), cams_(cams),
-        extrinsics_base_offset_(ext_base_off)
+                  const CalibDataVec &cams) :
+      world_points_(world_points), image_points_(image_points), cams_(cams)
       {
       }
 
     template <typename T>
     bool operator()(T const *const *params, T *residual) const
       {
-        const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[1][0]);
+        unsigned int extrins_idx = cams_.size() > 1 ? 2 : 1;
+        const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[extrins_idx][0]);
         const Mat<T, 3, 3>  R_frame = rotation_matrix(R_vec_frame);
-        const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[1][3]);
+        const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[extrins_idx][3]);
 
         unsigned int residual_count = 0;
         unsigned int intrinsics_offset = 0;
@@ -76,13 +76,12 @@ namespace multicam_calibration {
               }
             else
               {
-                const auto extrinsic_start_idx = extrinsics_base_offset_ + 6 * (cam_idx - 1);
+                const auto extrinsic_start_idx = 6 * (cam_idx - 1);
                 const Vec<T, 3> R_vec_cam =
-                  Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx]);
-                //std::cout << "rvec: " << R_vec_cam(0, 0) << " " << R_vec_cam(1,0) << " " << R_vec_cam(2,0) << std::endl;
+                  Eigen::Map<const Vec<T, 3>>(&params[1][extrinsic_start_idx]);
                 R_cam = rotation_matrix(R_vec_cam); // rotation vector
-                t_cam = 
-                  Eigen::Map<const Vec<T, 3>>(&params[0][extrinsic_start_idx + 3]);
+                t_cam = Eigen::Map<const Vec<T, 3>>(&params[1][extrinsic_start_idx + 3]);
+                std::cout.flush();
               }
                   
             const Mat<T, 3, 3> R = R_cam * R_frame;
@@ -113,7 +112,6 @@ namespace multicam_calibration {
     const std::vector<FrameWorldPoints> world_points_;
     const std::vector<FrameImagePoints> image_points_;
     CalibDataVec cams_;
-    unsigned int extrinsics_base_offset_;
   };
 
   static std::vector<double> transform_to_rvec_tvec(const CameraExtrinsics &tf) {
@@ -138,8 +136,8 @@ namespace multicam_calibration {
     int off(0);
     std::cout << "------------------- parameters: -------------------" << std::endl;
     unsigned int intrinsics_offset(0);
-    unsigned int extrinsics_base = get_extrinsics_base(cams);
-    for(const auto cam_idx : irange(0u, (unsigned int)cams.size())) {
+    unsigned int extrinsics_base = get_num_intrinsics(cams);
+    for(const auto cam_idx : irange<size_t>(0ul, cams.size())) {
       const CalibrationData &cam = cams[cam_idx];
       unsigned int off = intrinsics_offset;
       std::cout << "--------- camera # " << cam_idx << std::endl;
@@ -155,8 +153,8 @@ namespace multicam_calibration {
         const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
         Mat<double, 3, 3> R = rotation_matrix(rvec);
         const Vec<double, 3> t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
-        std::cout << "T_cam_cam0:  rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
-             << vec_to_str(&t(0), 3) << "]" << std::endl;
+        //std::cout << "T_cam_cam0:  rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
+        //<< vec_to_str(&t(0), 3) << "]" << std::endl;
       }
       intrinsics_offset += cam.intrinsics.intrinsics.size() +
         cam.intrinsics.distortion_coeffs.size();
@@ -212,10 +210,13 @@ namespace multicam_calibration {
                     std::end(ci.distortion_coeffs));
     }
     // initialize T_cn_cnm1, only for cameras > 0
+    CameraExtrinsics T_cnm1_c0 = CameraExtrinsics::Identity();
     for(const auto cam_idx : irange(1u, num_cameras)) {
       // ------------ relative to camera 0 -----------------
-      std::vector<double> rvec_tvec = transform_to_rvec_tvec(calibrationData_[cam_idx].T_cn_cnm1);
+      CameraExtrinsics T_cn_c0 = calibrationData_[cam_idx].T_cn_cnm1 * T_cnm1_c0;
+      std::vector<double> rvec_tvec = transform_to_rvec_tvec(T_cn_c0);
       params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
+      T_cnm1_c0 = T_cn_c0;
     }
     // the number of frames are the same across all cameras,
     // although not all frames must contain detected points
@@ -262,9 +263,9 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    unsigned int numIntrinsics = get_num_intrinsics(calibrationData_);
     // add the extrinsics between cam0 and the rest
-    unsigned int totNumCameraParams = extrinsicsBase + 6 * (num_cameras - 1);
+    unsigned int totNumCameraParams = numIntrinsics + 6 * (num_cameras - 1);
     
     for (const auto fnum : irange(0u, num_frames))  {
       std::vector<FrameWorldPoints> frame_world_points;
@@ -276,14 +277,18 @@ namespace multicam_calibration {
         frame_num_points += frame_world_points[cam_idx].size();
       }
       const auto fr = FrameResidual(frame_world_points, frame_image_points,
-                                    calibrationData_, extrinsicsBase);
+                                    calibrationData_);
       const unsigned numResiduals = 2 * frame_num_points;
       std::vector<double> residuals(numResiduals);
       // point offset to cam0 pose for this particular frame
       const auto R_vec_offset = totNumCameraParams + 6 * fnum;
-      double const * const params[2] = {&params_[0], &params_[R_vec_offset]};
-      // compute residuals
-      fr(params, residuals.data());
+      if (num_cameras > 1) {
+        double const * const params[3] = {&params_[0], &params_[numIntrinsics], &params_[R_vec_offset]};
+        fr(params, residuals.data());
+      } else {
+        double const * const params[2] = {&params_[0], &params_[R_vec_offset]};
+        fr(params, residuals.data());
+      }
       // unpack residuals into vector of vectors of vectors
       res.push_back(std::vector<std::vector<Vec2d>>()); // empty for this frame
       for (const auto cam_idx : irange(0u, num_cameras)) {
@@ -304,7 +309,7 @@ namespace multicam_calibration {
     const std::vector<double> &p = params_;
     
     CameraExtrinsics T_cn_cam0 = identity();
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    unsigned int numIntrinsics = get_num_intrinsics(calibrationData_);
     unsigned int intrinsics_offset = 0;
 
     CameraExtrinsics T_cnm1_0   = CameraExtrinsics::Identity();
@@ -312,7 +317,7 @@ namespace multicam_calibration {
       CalibrationData cd(calibrationData_[cam_idx]);
       CameraExtrinsics T_cn_0   = CameraExtrinsics::Identity();
       if (cam_idx > 0) {
-        unsigned int off = extrinsicsBase + 6 * (cam_idx - 1);
+        unsigned int off = numIntrinsics + 6 * (cam_idx - 1);
         const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
         Mat<double, 3, 3>       R = rotation_matrix(rvec);
         const Vec<double, 3>    t = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
@@ -353,10 +358,10 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
-    unsigned int extrinsicsBase = get_extrinsics_base(calibrationData_);
+    // number of intrinsic parameters for all cameras
+    unsigned int numIntrinsics = get_num_intrinsics(calibrationData_);
     // add the extrinsics between cam0 and the rest
-
-    unsigned int totNumCameraParams = extrinsicsBase + 6 * (num_cameras - 1);
+    unsigned int totNumCameraParams = numIntrinsics + 6 * (num_cameras - 1);
 
     //
     // Create one FrameResidual for each frame
@@ -371,19 +376,28 @@ namespace multicam_calibration {
         frame_num_points += frame_world_points[cam_idx].size();
       }
       auto cost_function = new ceres::DynamicAutoDiffCostFunction<FrameResidual>(
-        new FrameResidual(frame_world_points, frame_image_points, calibrationData_,
-                          extrinsicsBase));
-      // Per camera intrinsics + (ncam-1) extrinsics
-      cost_function->AddParameterBlock(totNumCameraParams);
+        new FrameResidual(frame_world_points, frame_image_points, calibrationData_));
+      std::vector<double *> v;
+      // Per camera intrinsics
+      cost_function->AddParameterBlock(numIntrinsics);
+      v.push_back(&params[0]);
+      
+      // (ncam-1) extrinsics
+      if (num_cameras > 1) {
+        cost_function->AddParameterBlock(6*(num_cameras - 1));
+        v.push_back(&params[numIntrinsics]);
+      }
       // Pose of cam0 wrt calib board
       cost_function->AddParameterBlock(6);
+      const auto R_vec_offset = totNumCameraParams + 6 * i;
+      v.push_back(&params[R_vec_offset]);
+      
        // Reprojection error
       cost_function->SetNumResiduals(2 * frame_num_points);
-      // point offset to cam0 pose for this particular frame
-      const auto R_vec_offset = totNumCameraParams + 6 * i;
-      problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0),
-                               &params[0], &params[R_vec_offset]);
-      //problem.SetParameterBlockConstant(&params[0]);
+      problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0), v);
+      if (fixIntrinsics_) {
+        problem.SetParameterBlockConstant(v[0]);
+      }
     }
   }
 }

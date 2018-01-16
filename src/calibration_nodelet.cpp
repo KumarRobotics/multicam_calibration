@@ -56,6 +56,9 @@ namespace multicam_calibration {
     ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
     detector_.reset(new MultiCamApriltagDetector(nh));
     nh.param<int>("skip_num_frames", skipFrames_, 1);
+    bool fixIntrinsics;
+    nh.param<bool>("fix_intrinsics", fixIntrinsics, false);
+    calibrator_->setFixIntrinsics(fixIntrinsics);
     
     image_transport::ImageTransport it(nh);
     for (const auto &camdata : cameras_) {
