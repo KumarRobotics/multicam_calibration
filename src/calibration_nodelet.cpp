@@ -41,13 +41,11 @@ namespace multicam_calibration {
   }
 
   void CalibrationNodelet::onInit() {
+    cameras_ready_ = false;
     calibrator_.reset(new Calibrator());
     ros::NodeHandle nh = getPrivateNodeHandle();
     try {
       parseCameras();
-      if (cameras_.size() > 3) {
-        throw std::runtime_error("only up to 3 cameras supported right now!");
-      }
     } catch (const std::runtime_error &e) {
       ROS_ERROR_STREAM("error parsing cameras: " << e.what());
       ros::shutdown();
@@ -107,12 +105,13 @@ namespace multicam_calibration {
 
   void CalibrationNodelet::parseCameras() {
     ros::NodeHandle nh = getPrivateNodeHandle();
-    std::vector<std::string> camNames = {"cam0", "cam1", "cam2"};
-    for (const auto &cam : camNames) {
+
+    int cam_index = 0; 
+    while (true) {
+      std::string cam = "cam" + std::to_string(cam_index);
       XmlRpc::XmlRpcValue lines;
-      if (!nh.getParam(cam, lines)) {
-        continue;
-      }
+      if (!nh.getParam(cam, lines)) break; // no more cameras!
+      ROS_INFO_STREAM("Parsing " << cam);
       CalibrationData calibData;
       calibData.name = cam;
       CameraIntrinsics &ci = calibData.intrinsics;
@@ -132,7 +131,10 @@ namespace multicam_calibration {
       imagePoints_.push_back(CamImagePoints());
       calibrator_->addCamera(cam, calibData);
       ROS_INFO_STREAM("added camera: " << cam);
+      cam_index++;
     }
+    ROS_INFO_STREAM("Found " << cameras_.size() << " cameras! Moving on...");
+    cameras_ready_ = true;
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
 
@@ -383,6 +385,16 @@ namespace multicam_calibration {
         sync3_->registerCallback(&CalibrationNodelet::callback3, this);
       }
       break;
+    case 4:
+      if (use_approximate_sync_) {
+        approx_sync4_.reset(new ApproxTimeSynchronizer4(
+                              ApproxSyncPolicy4(60/*q size*/),
+                              *(sub_[0]), *(sub_[1]), *(sub_[2]), *(sub_[3])));
+        approx_sync4_->registerCallback(&CalibrationNodelet::callback4, this);
+      } else {
+        ROS_ERROR("No exact sync beyond 3 cameras, right now");
+      }
+      break;
     default:
       ROS_ERROR("invalid number of subscribers!");
     }
@@ -621,4 +633,24 @@ namespace multicam_calibration {
     std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2};
     process(msg_vec);
   }
+  void CalibrationNodelet::callback4(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback5(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback6(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4, ImageConstPtr const &img5) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4, img5};
+    process(msg_vec);
+  }
+
 }

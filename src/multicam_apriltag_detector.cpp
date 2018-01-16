@@ -77,7 +77,7 @@ namespace multicam_calibration {
       for(auto const &tag : img_apriltags)
         {
           int const id = tag.id;
-          if (id >= num_tags) {
+          if ((size_t)id >= num_tags) {
             ROS_WARN_STREAM("tag with invalid id found: "
                             << id << " (check your calibration target!)");
             continue;
