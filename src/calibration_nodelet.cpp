@@ -41,13 +41,11 @@ namespace multicam_calibration {
   }
 
   void CalibrationNodelet::onInit() {
+    cameras_ready_ = false;
     calibrator_.reset(new Calibrator());
     ros::NodeHandle nh = getPrivateNodeHandle();
     try {
       parseCameras();
-      if (cameras_.size() > 3) {
-        throw std::runtime_error("only up to 3 cameras supported right now!");
-      }
     } catch (const std::runtime_error &e) {
       ROS_ERROR_STREAM("error parsing cameras: " << e.what());
       ros::shutdown();
@@ -56,6 +54,9 @@ namespace multicam_calibration {
     ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
     detector_.reset(new MultiCamApriltagDetector(nh));
     nh.param<int>("skip_num_frames", skipFrames_, 1);
+    bool fixIntrinsics;
+    nh.param<bool>("fix_intrinsics", fixIntrinsics, false);
+    calibrator_->setFixIntrinsics(fixIntrinsics);
     
     image_transport::ImageTransport it(nh);
     for (const auto &camdata : cameras_) {
@@ -104,12 +105,13 @@ namespace multicam_calibration {
 
   void CalibrationNodelet::parseCameras() {
     ros::NodeHandle nh = getPrivateNodeHandle();
-    std::vector<std::string> camNames = {"cam0", "cam1", "cam2"};
-    for (const auto &cam : camNames) {
+
+    int cam_index = 0; 
+    while (true) {
+      std::string cam = "cam" + std::to_string(cam_index);
       XmlRpc::XmlRpcValue lines;
-      if (!nh.getParam(cam, lines)) {
-        continue;
-      }
+      if (!nh.getParam(cam, lines)) break; // no more cameras!
+      ROS_INFO_STREAM("Parsing " << cam);
       CalibrationData calibData;
       calibData.name = cam;
       CameraIntrinsics &ci = calibData.intrinsics;
@@ -124,12 +126,29 @@ namespace multicam_calibration {
       if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
+      if (cam_index == 0) {
+        if (calibData.T_cn_cnm1 != identity()) {
+          ROS_WARN_STREAM("Cam0 had a non-identity T_cn_cnm1 specified!");
+          calibData.T_cn_cnm1 = identity();
+        }
+      } else {
+        Eigen::Matrix<double,3,3> R = calibData.T_cn_cnm1.block<3,3>(0,0);
+        Eigen::Matrix<double,3,3> I = Eigen::Matrix<double,3,3>::Identity();
+        if (R == I) {
+          ROS_ERROR_STREAM(cam << " cannot have an identity rotation in T_cn_cnm1. Perturb values as needed.");
+          Eigen::AngleAxisd a(0.00001,Eigen::Vector3d::UnitX());
+          calibData.T_cn_cnm1.block<3,3>(0,0) = a.toRotationMatrix();
+        }
+      }
       cameras_.push_back(calibData);
       worldPoints_.push_back(CamWorldPoints());
       imagePoints_.push_back(CamImagePoints());
       calibrator_->addCamera(cam, calibData);
       ROS_INFO_STREAM("added camera: " << cam);
+      cam_index++;
     }
+    ROS_INFO_STREAM("Found " << cameras_.size() << " cameras! Moving on...");
+    cameras_ready_ = true;
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
 
@@ -380,6 +399,16 @@ namespace multicam_calibration {
         sync3_->registerCallback(&CalibrationNodelet::callback3, this);
       }
       break;
+    case 4:
+      if (use_approximate_sync_) {
+        approx_sync4_.reset(new ApproxTimeSynchronizer4(
+                              ApproxSyncPolicy4(60/*q size*/),
+                              *(sub_[0]), *(sub_[1]), *(sub_[2]), *(sub_[3])));
+        approx_sync4_->registerCallback(&CalibrationNodelet::callback4, this);
+      } else {
+        ROS_ERROR("No exact sync beyond 3 cameras, right now");
+      }
+      break;
     default:
       ROS_ERROR("invalid number of subscribers!");
     }
@@ -469,7 +498,7 @@ namespace multicam_calibration {
         img_pts[frame_count - 1].emplace_back(cam_x, cam_y);
       }
     in.close();
-    printf("Got data for %u frames\n", frame_count);
+    printf("read %u frames from corners file for cam %u\n", frame_count, camera_id);
     return true;
   }
 
@@ -618,4 +647,24 @@ namespace multicam_calibration {
     std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2};
     process(msg_vec);
   }
+  void CalibrationNodelet::callback4(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback5(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4};
+    process(msg_vec);
+  }
+
+  void CalibrationNodelet::callback6(ImageConstPtr const &img0, ImageConstPtr const &img1,
+                                     ImageConstPtr const &img2, ImageConstPtr const &img3,
+                                     ImageConstPtr const &img4, ImageConstPtr const &img5) {
+    std::vector<ImageMsg::ConstPtr> msg_vec = {img0, img1, img2, img3, img4, img5};
+    process(msg_vec);
+  }
+
 }

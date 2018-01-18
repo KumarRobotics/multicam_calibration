@@ -176,7 +176,7 @@ namespace multicam_calibration {
 
 
     double perPointErr(0);
-    if (ipts1proj.size() >= 0)  {
+    if (ipts1proj.size() > 0)  {
       perPointErr = std::sqrt(e / (double)ipts1proj.size());
     }
     ROS_INFO_STREAM("camera: " << cam1_idx << " points: " << ipts1proj.size() << " reproj err: " << perPointErr);
