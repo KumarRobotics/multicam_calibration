@@ -26,6 +26,8 @@ namespace multicam_calibration {
     // ---------- variables
 
     ros::Subscriber             cameraInfoSub_;
+    ros::Publisher              cameraInfoPub_;
+    sensor_msgs::CameraInfo     cameraInfo_;
     image_transport::Subscriber imageSub_;
     image_transport::Publisher  imagePub_;
 
