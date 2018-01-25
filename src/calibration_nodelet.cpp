@@ -75,15 +75,17 @@ namespace multicam_calibration {
     subscribe();
     std::string filename;
     if (nh.getParam("corners_file", filename)) {
-      if (!readPointsFromFile(filename)) {
-        ROS_ERROR_STREAM("file not found or bad: " << filename);
-      } else {
+      if (readPointsFromFile(filename)) {
         if (!worldPoints_.empty()) {
           ROS_INFO_STREAM("read " << worldPoints_[0].size() << " frames from " << filename);
           CalibrationCmd::Request rq;
           CalibrationCmd::Response rsp;
           calibrate(rq, rsp);
           ros::shutdown();
+        }
+      } else {
+        if (!filename.empty()) {
+          ROS_ERROR_STREAM("file not found or bad: " << filename);
         }
       }
     }
@@ -126,6 +128,9 @@ namespace multicam_calibration {
       if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
+      
+      nh.param<bool>(cam + "/fix_intrinsics",  calibData.fixIntrinsics, false);
+      nh.param<bool>(cam + "/fix_extrinsics",  calibData.fixExtrinsics, false);
       if (cam_index == 0) {
         if (calibData.T_cn_cnm1 != identity()) {
           ROS_WARN_STREAM("Cam0 had a non-identity T_cn_cnm1 specified!");

@@ -26,6 +26,8 @@ namespace multicam_calibration {
     CameraExtrinsics  T_cn_cnm1;
     std::string       rostopic;
     int tagCount{0};
+    bool              fixIntrinsics{false};
+    bool              fixExtrinsics{false};
     // 
     static CalibDataVec parse_cameras(const ros::NodeHandle &nh);
   };
