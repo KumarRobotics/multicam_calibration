@@ -14,6 +14,7 @@
   <exec_depend>message_runtime</exec_depend>
   <depend>apriltag_msgs</depend>
   <depend>apriltag_ros</depend>
+  <depend>cv_bridge</depend>
   <depend>image_transport</depend>
   <depend>nodelet</depend>
   <depend>sensor_msgs</depend>
