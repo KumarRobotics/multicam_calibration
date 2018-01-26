@@ -21,11 +21,17 @@ namespace multicam_calibration {
       ROS_WARN("no camera info received yet!");
       return;
     }
-    cv::Mat im =
-      cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8)->image;
+    bool isBayer = (img->encoding == "bayer_rggb8");
+    bool outputColor = isBayer;
+    std::string target_encoding = isBayer ?
+      sensor_msgs::image_encodings::BGR8 :
+      sensor_msgs::image_encodings::MONO8;
+    cv::Mat im = cv_bridge::toCvCopy(img, target_encoding)->image;
+    
     cv::Mat rectim;
     cv::remap(im, rectim, mapx_, mapy_, cv::INTER_LINEAR);
-    imagePub_.publish(cv_bridge::CvImage(img->header, "mono8",
+    std::string output_encoding = outputColor ? "bgr8" : "mono8";
+    imagePub_.publish(cv_bridge::CvImage(img->header, output_encoding,
                                          rectim).toImageMsg());
     cameraInfo_.header = img->header;
     cameraInfoPub_.publish(cameraInfo_);
@@ -39,9 +45,14 @@ namespace multicam_calibration {
     cv::Mat K(3, 3, CV_64F, (void *)&camInfo->K[0]);
     cv::Mat D(4, 1, CV_64F, (void *)&camInfo->D[0]);
     cv::Mat R = cv::Mat::eye(3,3, CV_64F);
-    std::cout << K << std::endl;
     cv::fisheye::initUndistortRectifyMap(K, D, R, K, new_sz,
                                          CV_32FC1, mapx_, mapy_);
+    cameraInfo_.D.clear();  // no distortion!
+    cameraInfo_.R = {1.0, 0.0, 0.0,   0.0, 1.0, 0.0,   0.0, 0.0, 1.0};
+    const double *cK = &camInfo->K[0];
+    cameraInfo_.P = {cK[0],  cK[1],  cK[2], 0.0,
+                     cK[3],  cK[4],  cK[5], 0.0,
+                     cK[6],  cK[7],  cK[8], 0.0};
     cameraInfoSub_.shutdown();
   }
 }
