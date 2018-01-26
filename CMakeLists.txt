@@ -3,10 +3,10 @@ project(multicam_calibration)
 
 add_compile_options(-std=c++14 -Wall -fopenmp)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
 find_package(catkin_simple REQUIRED)
 find_package(Ceres REQUIRED)
+
+include_directories(${CERES_INCLUDE_DIRS})
 
 catkin_simple()
 
@@ -16,7 +16,7 @@ cs_add_library(undistort_nodelet src/undistort_nodelet.cpp)
 
 target_link_libraries(calibration_nodelet ${CATKIN_LIBRARIES} ${CERES_LIBRARIES})
 target_link_libraries(calibration_test_nodelet ${CATKIN_LIBRARIES} ${CERES_LIBRARIES})
-target_link_libraries(undistort_nodelet ${CATKIN_LIBRARIES})        
+target_link_libraries(undistort_nodelet ${CATKIN_LIBRARIES})
 
 cs_add_executable(test_rectify_node src/test_rectify_node.cpp src/test_rectify.cpp)
 target_link_libraries(test_rectify_node ${CATKIN_LIBRARIES})
