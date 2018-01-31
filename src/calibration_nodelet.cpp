@@ -174,13 +174,14 @@ namespace multicam_calibration {
       ROS_ERROR("empty calibration results, no file written!");
       return (false);
     }
-    std::string baseName, linkName, calibDir;
+    std::string baseName, linkName, calibDir, resultsDir;
     ros::NodeHandle nh = getPrivateNodeHandle();
     nh.param<std::string>("output_filename", baseName, "calibration_output");
     nh.param<std::string>("latest_link_name", linkName, "latest.yaml");
     nh.param<std::string>("calib_dir", calibDir, "calib");
+    nh.param<std::string>("results_dir", resultsDir, "");
 
-    std::string fname = make_filename(baseName);
+    std::string fname = resultsDir + make_filename(baseName);
     std::string fullname = calibDir + "/" + fname;
     
     ROS_INFO_STREAM("writing calibration to " << fullname);
