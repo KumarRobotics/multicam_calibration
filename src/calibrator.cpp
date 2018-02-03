@@ -40,7 +40,7 @@ namespace multicam_calibration {
   //     ...
   // params[ncam-1] = extrinsics camn->cam0
   // params[ncam]   = frame_tf
-  
+
   static std::vector<double *>
   params_to_blocks(const CalibDataVec &cdv, std::vector<double> &params,
                    unsigned int frame_num) {
@@ -58,7 +58,7 @@ namespace multicam_calibration {
     v.push_back(&params[R_vec_offset]);
     return (v);
   }
-  
+
 
   struct FrameResidual
   {
@@ -95,7 +95,7 @@ namespace multicam_calibration {
               D(i) = params[0][intrinsics_offset +
                                cam.intrinsics.intrinsics.size() + i];
             }
-                  
+
             Mat<T, 3, 3> R_cam;
             Vec<T, 3> t_cam;
             if(cam_idx == 0)
@@ -112,10 +112,10 @@ namespace multicam_calibration {
                 t_cam = Eigen::Map<const Vec<T, 3>>(&params[cam_idx][3]);
                 std::cout.flush();
               }
-                  
+
             const Mat<T, 3, 3> R = R_cam * R_frame;
             const Vec<T, 3> t = R_cam * t_frame + t_cam;
-            std::vector<Point2<T>> projected_points;
+            vector_aligned<Point2<T>> projected_points;
             if (cam.intrinsics.distortion_model == "equidistant") {
               projected_points = utils::project_frame_equidistant(world_points_[cam_idx], R, t, K, D);
             } else if (cam.intrinsics.distortion_model == "radtan") {
@@ -158,7 +158,7 @@ namespace multicam_calibration {
     return (v);
   }
 
-#ifdef DEBUG_PARAMS  
+#ifdef DEBUG_PARAMS
   static void print_params(const std::vector<double> &p, const CalibDataVec &cams) {
     using utils::rotation_matrix;
     using utils::vec_to_str;
@@ -198,7 +198,7 @@ namespace multicam_calibration {
       const Vec<double, 3> t  = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
       std::cout << "rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
                 << vec_to_str(&t(0), 3) << "]" << std::endl;
-#endif      
+#endif
     }
   }
 #endif
@@ -229,7 +229,7 @@ namespace multicam_calibration {
   void Calibrator::initializeVariables(std::vector<double> *param_ptr) {
     std::vector<double> &params = *param_ptr;
     const unsigned int num_cameras = calibrationData_.size();
-    
+
     // initialize intrinsics
     for (const auto cam_idx : irange(0u, num_cameras)) {
       const CameraIntrinsics &ci = calibrationData_[cam_idx].intrinsics;
@@ -255,7 +255,7 @@ namespace multicam_calibration {
       std::vector<double> rvec_tvec = transform_to_rvec_tvec(cam0PoseGuess_[i]);
       params.insert(params.end(), rvec_tvec.begin(), rvec_tvec.end());
     };
-#ifdef DEBUG_PARAMS    
+#ifdef DEBUG_PARAMS
     print_params(params, calibrationData_);
 #endif
   }
@@ -326,7 +326,7 @@ namespace multicam_calibration {
     }
     const CameraExtrinsics &T_cam0_imu = calibrationData_[0].T_cam_imu;
     const std::vector<double> &p = params_;
-    
+
     CameraExtrinsics T_cn_cam0 = identity();
     unsigned int numIntrinsics = get_num_intrinsics(calibrationData_);
     unsigned int intrinsics_offset = 0;
@@ -344,7 +344,7 @@ namespace multicam_calibration {
         T_cn_0.block<3,3>(0, 0) = R;
         T_cn_0.block<3,1>(0, 3) = t;
         T_cn_0(3,3) = 1.0;
-        
+
         cd.T_cn_cnm1 = T_cn_0 * T_cnm1_0.inverse();
 
         T_cn_cam0 = cd.T_cn_cnm1 * T_cn_cam0;
@@ -352,9 +352,9 @@ namespace multicam_calibration {
           cd.T_cam_imu = T_cn_0 * T_cam0_imu;
         }
       }
-      
+
       T_cnm1_0 = T_cn_0;
-      
+
       // offset for intrinsics
       for (unsigned int i = 0; i < cd.intrinsics.intrinsics.size(); i++) {
         cd.intrinsics.intrinsics[i] = p[intrinsics_offset + i];
@@ -373,7 +373,7 @@ namespace multicam_calibration {
   void Calibrator::setupOptimizationProblem(ceres::Problem *prob, std::vector<double> *vars) {
     std::vector<double> &params = *vars;
     ceres::Problem     &problem = *prob;
-    
+
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
@@ -403,7 +403,7 @@ namespace multicam_calibration {
       }
       // Pose of cam0 wrt calib board
       cost_function->AddParameterBlock(6);
-      
+
       // Reprojection error
       cost_function->SetNumResiduals(2 * frame_num_points);
       problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0), v);

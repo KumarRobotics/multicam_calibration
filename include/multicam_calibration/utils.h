@@ -22,10 +22,10 @@ namespace multicam_calibration {
 
     template <typename T>
       using DynVec = Eigen::Matrix<T, Eigen::Dynamic, 1>;
-    
+
     template <typename T, int M, int N>
       using Mat = Eigen::Matrix<T, M, N>;
-    
+
     template <typename T>
       Mat<T, 3, 3> rotation_matrix(const Vec<T, 3> &vec) {
       T angle = T(0);
@@ -58,7 +58,7 @@ namespace multicam_calibration {
                       pose.second.x, pose.second.y, pose.second.z};
       return (vec_to_str(p, 12));
     }
-    
+
     template <typename T>
     Point2<T> project_point_equidistant(const Vec<T, 3> &X_world,
                                         const Mat<T, 3, 3> &R, const Vec<T, 3> &t,
@@ -82,10 +82,12 @@ namespace multicam_calibration {
     }
 
     template <typename T>
-    std::vector<Point2<T>> project_frame_equidistant(
+    vector_aligned<Point2<T>> project_frame_equidistant(
       const std::vector<Point3<double>> &world_points, const Mat<T, 3, 3> &R,
       const Vec<T, 3> &t, const Mat<T, 3, 3> &K, const DynVec<T> &D) {
-      std::vector<Point2<T>> projected_points;
+      // Requires an aligned vector since it can be called with T = ceres::Jet
+      // which contains an Eigen::Matrix
+      vector_aligned<Point2<T>> projected_points;
       projected_points.reserve(world_points.size());
       for(const auto point : world_points)
         {
@@ -109,7 +111,7 @@ namespace multicam_calibration {
       T xy  =  x * y;
       T rsq = x2 + y2;
       T r4  = rsq * rsq;
-            
+
       T numerator = T{1.0} + D[0] * rsq + D[1] * r4;
       T denom     = T{1.0};
 
@@ -129,17 +131,19 @@ namespace multicam_calibration {
       T ratio = numerator / denom;
       T xpp = x * ratio + T{2.0} * D[2] * xy                  + D[3] * (rsq + T{2.0} * x2);
       T ypp = y * ratio + T{2.0} * D[2] * (rsq + T{2.0} * y2) + D[3] * xy;
-                                   
+
       const Vec<T, 3> x_dn{xpp, ypp, T{1.0}};
       const Vec<T, 3> x_dp = K * x_dn;
       return Point2<T>{x_dp(0), x_dp(1)};
     }
- 
+
     template <typename T>
-    std::vector<Point2<T>> project_frame_radtan(
+    vector_aligned<Point2<T>> project_frame_radtan(
       const std::vector<Point3<double>> &world_points, const Mat<T, 3, 3> &R,
       const Vec<T, 3> &t, const Mat<T, 3, 3> &K, const DynVec<T> &D) {
-      std::vector<Point2<T>> projected_points;
+      // Requires an aligned vector since it can be called with T = ceres::Jet
+      // which contains an Eigen::Matrix
+      vector_aligned<Point2<T>> projected_points;
       projected_points.reserve(world_points.size());
       for(const auto point : world_points)
         {
