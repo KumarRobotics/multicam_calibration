@@ -48,7 +48,7 @@ namespace multicam_calibration {
                                                  &CalibrationTestNodelet::TestCamera::camInfoCallback,
                                                  cameras_.back().get());
     }
-    subscribe();
+    setupSync();
   }
 
   void CalibrationTestNodelet::TestCamera::camInfoCallback(const CameraInfoConstPtr &ci) {
@@ -75,8 +75,11 @@ namespace multicam_calibration {
     camInfoSub_.shutdown();
   }
 
-  void CalibrationTestNodelet::subscribe() {
+  void CalibrationTestNodelet::setupSync() {
     switch (sub_.size()) {
+    case 0:
+      // no subscribers, must be single camera
+      return;
     case 2:
       if (useApproximateSync_) {
         approx_sync2_.reset(new ApproxTimeSynchronizer2(
@@ -98,7 +101,7 @@ namespace multicam_calibration {
       }
       break;
     default:
-      ROS_ERROR("invalid number of subscribers!");
+      ROS_ERROR_STREAM("invalid number of subscribers: " << sub_.size());
     }
   }
 
@@ -161,12 +164,15 @@ namespace multicam_calibration {
     cv::cvtColor(gray, img, CV_GRAY2BGR);
         
     double e(0);
-    const cv::Scalar color(200, 0, 255);
+    const cv::Scalar color_proj(200, 0, 255);
+    const cv::Scalar color_orig(200, 255, 0);
     for (unsigned int i = 0; i < ipts1proj.size(); i++) {
       const cv::Point2d p(ipts1proj[i].x, ipts1proj[i].y);
       const int w = 2; // 1/2 size of plotted point
       cv::rectangle(img, cv::Point(p.x-w, p.y-w), cv::Point(p.x+w, p.y+w),
-                    color, /*line width */ 1, /*line type*/ 8, 0);
+                    color_proj, /*line width */ 1, /*line type*/ 8, 0);
+      cv::rectangle(img, cv::Point(ipts1[i].x-w, ipts1[i].y-w), cv::Point(ipts1[i].x+w, ipts1[i].y+w),
+                    color_orig, /*line width */ 1, /*line type*/ 8, 0);
       double dx = (ipts1[i].x - ipts1proj[i].x);
       double dy = (ipts1[i].y - ipts1proj[i].y);
       e += dx*dx + dy*dy;
@@ -231,7 +237,6 @@ namespace multicam_calibration {
       const CameraExtrinsics T_1_w = T_1_0 * T_0_w;
       const auto &wpts1 = wp[cam1_idx];
       if (!wpts1.empty()) {
-#if 1
         if (!calc_err(cam1_idx,
                       ip[cam1_idx],
                       wpts1,
@@ -241,48 +246,6 @@ namespace multicam_calibration {
                       msg_vec[cam1_idx])) {
           continue;
         }
-#else        
-        const auto &ipts1 = 
-        const CameraIntrinsics &ci1 = cam1.intrinsics;
-        FrameImagePoints ipts1proj;
-        get_init_pose::project_points(wpts1, T_1_w, ci1.intrinsics,
-                                      ci1.distortion_model, ci1.distortion_coeffs,
-                                      &ipts1proj);
-        // draw points on image
-        cv_bridge::CvImageConstPtr const cv_ptr = cv_bridge::toCvShare(
-          msg_vec[cam1_idx], sensor_msgs::image_encodings::MONO8);
-        const cv::Mat gray = cv_ptr->image;
-        if (gray.rows == 0) {
-          ROS_ERROR("cannot decode image, not MONO8!");
-          continue;
-        }
-        cv::Mat img;
-        cv::cvtColor(gray, img, CV_GRAY2BGR);
-        
-        double e(0);
-        const cv::Scalar color(200, 0, 255);
-        for (unsigned int i = 0; i < ipts1.size(); i++) {
-          const cv::Point2d p(ipts1proj[i].x, ipts1proj[i].y);
-          const int w = 2; // 1/2 size of plotted point
-          cv::rectangle(img, cv::Point(p.x-w, p.y-w), cv::Point(p.x+w, p.y+w),
-                        color, /*line width */ 1, /*line type*/ 8, 0);
-          double dx = (ipts1[i].x - ipts1proj[i].x);
-          double dy = (ipts1[i].y - ipts1proj[i].y);
-          e += dx*dx + dy*dy;
-        }
-        cv_bridge::CvImage cv_img(msg_vec[cam1_idx]->header, sensor_msgs::image_encodings::BGR8, img);
-        imagePub_[cam1_idx].publish(cv_img.toImageMsg());
-
-
-        CamErr &ce = cam_error[cam1_idx]; // per-camera error
-        ce.errSum += e;
-        ce.cnt    += ipts1.size();
-        double perPointErr(0);
-        if (ce.cnt >= 0)  {
-          perPointErr = std::sqrt(ce.errSum / (double)ce.cnt);
-        }
-        ROS_INFO_STREAM("camera: " << cam1_idx << " points: " << ce.cnt << " reproj err: " << perPointErr);
-#endif        
       } else {
         ROS_WARN_STREAM("skipping camera " << cam1_idx << " (no points!)");
         continue;

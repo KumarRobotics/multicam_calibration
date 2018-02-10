@@ -51,7 +51,7 @@ namespace multicam_calibration {
     void callback2(ImageConstPtr const &img0, ImageConstPtr const &img1);
     void callback3(ImageConstPtr const &img0, ImageConstPtr const &img1, ImageConstPtr const &img2);
     void process(const std::vector<ImageConstPtr> &msg_vec);
-    void subscribe();
+    void setupSync();
     void publishDebugImages(const std::vector<ImageConstPtr> &msg_vec,
                             const std::vector<apriltag_ros::ApriltagVec> &detected_tags);
     bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf) const;
