@@ -127,7 +127,7 @@ namespace multicam_calibration {
       while (dc.size() < 4) {
         dc.push_back(0);
       }
-      cv::Mat dist(4, 1, CV_64FC1, &dc[0]);
+      cv::Mat dist(dc.size(), 1, CV_64FC1, &dc[0]);
 
       cv::Affine3d::Mat4 T_mat = {te(0,0), te(0,1), te(0,2), te(0,3),
                                   te(1,0), te(1,1), te(1,2), te(1,3),
