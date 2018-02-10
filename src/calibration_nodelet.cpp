@@ -189,7 +189,7 @@ namespace multicam_calibration {
     writeCalibration(of, results);
     writeCalibration(std::cout, results);
     // test with poses from optimizer
-    testCalibration();
+    testCalibration(results);
     // test with poses computed from homography
     homographyTest(results);
     std::string cmd = "ln -sf " + fname + " " + calibDir + "/" + linkName;
@@ -203,7 +203,7 @@ namespace multicam_calibration {
   static double avg(const Stat &s) {
     return (s.second > 0 ? s.first/s.second : 0.0);
   }
-  void CalibrationNodelet::testCalibration() {
+  void CalibrationNodelet::testCalibration(const CalibDataVec &calib) {
     Calibrator::Residuals res;
     calibrator_->testCalibration(&res);
     if (res.size() == 0) {
@@ -227,7 +227,16 @@ namespace multicam_calibration {
           totErr.second++;
           cameraStats[cam_idx].first += err;
           cameraStats[cam_idx].second++;
-          resFiles[cam_idx] << v(0) << " " << v(1) << std::endl;
+          const auto &wp = worldPoints_[cam_idx][fnum][res_idx];
+          const auto &ip = imagePoints_[cam_idx][fnum][res_idx];
+          Calibrator::Vec2d dp(ip.x - calib[cam_idx].intrinsics.intrinsics[2],
+                               ip.y - calib[cam_idx].intrinsics.intrinsics[3]);
+                   
+          resFiles[cam_idx] << wp.x << " " << wp.y << " "
+                            << ip.x << " " << ip.y << " "
+                            << dp(0) << " " << dp(1) << " "
+                            << std::sqrt(dp(0) * dp(0) + dp(1) * dp(1)) << " " 
+                            << std::sqrt(err) << " " << v(0) << " " << v(1) << std::endl;
           if (err > maxErr.first) {
             maxErr.first  = err;
             maxErr.second = fnum;

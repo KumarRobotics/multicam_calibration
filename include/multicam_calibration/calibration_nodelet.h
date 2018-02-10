@@ -65,7 +65,8 @@ namespace multicam_calibration {
     bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf) const;
     void writeCalibration(std::ostream &os, const CalibDataVec &results);
     void homographyTest(const CalibDataVec &results) const;
-    void testCalibration();
+    void testCalibration(const CalibDataVec &calib);
+
     bool readPointsFromFile(const std::string &fname);
     // ---------- variables
     std::unique_ptr<MultiCamApriltagDetector> detector_;
