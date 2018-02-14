@@ -19,7 +19,7 @@ namespace multicam_calibration {
     }
   }
 
-  MultiCamApriltagDetector::MultiCamApriltagDetector(ros::NodeHandle &nh)  {
+  MultiCamApriltagDetector::MultiCamApriltagDetector(ros::NodeHandle &nh, const std::string& filename)  {
     auto const target_type = get_param<std::string>(nh, "target_type");
     if(target_type != "aprilgrid")
       throw std::invalid_argument("target_type != aprilgrid");
@@ -30,7 +30,7 @@ namespace multicam_calibration {
     target_tag_size_ = get_param<float>(nh, "tagSize");
     target_tag_spacing_ratio_ = get_param<float>(nh, "tagSpacing");
 
-    std::string outfname = "corners.csv";
+    std::string outfname = filename;
     outfile_.open(outfname, std::ofstream::out);
     if(!outfile_) {
         throw std::runtime_error("cannot open output file " + outfname);

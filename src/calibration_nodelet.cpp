@@ -61,6 +61,8 @@ namespace multicam_calibration {
     }
     nh.getParam("use_approximate_sync", use_approximate_sync_);
     ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
+    std::string filename;
+    nh.param("corners_file", filename, std::string(""));
     detector_.reset(new MultiCamApriltagDetector(nh));
     nh.param<int>("skip_num_frames", skipFrames_, 1);
     bool fixIntrinsics;
@@ -89,8 +91,7 @@ namespace multicam_calibration {
     }
     calibrationService_ = nh.advertiseService("calibration", &CalibrationNodelet::calibrate, this);
     subscribe();
-    std::string filename;
-    if (nh.getParam("corners_file", filename)) {
+    if (!filename.empty()) {
       if (readPointsFromFile(filename)) {
         if (!worldPoints_.empty()) {
           ROS_INFO_STREAM("read " << worldPoints_[0].size() << " frames from " << filename);
