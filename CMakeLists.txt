@@ -37,12 +37,6 @@ target_link_libraries(calibration_test_nodelet
   ${CATKIN_LIBRARIES}
   ${CERES_LIBRARIES})
 
-cs_add_library(undistort_nodelet
-  src/undistort_nodelet.cpp)
-target_link_libraries(undistort_nodelet
-  ${CATKIN_LIBRARIES}
-  ${OpenCV_LIBRARIES})
-
 cs_add_executable(test_rectify_node
   src/test_rectify_node.cpp
   src/test_rectify.cpp)
