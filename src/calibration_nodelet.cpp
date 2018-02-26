@@ -152,7 +152,7 @@ namespace multicam_calibration {
       ROS_INFO_STREAM("added camera: " << cam);
       cam_index++;
     }
-    ROS_INFO_STREAM("Found " << cameras_.size() << " cameras! Moving on...");
+    ROS_INFO_STREAM("Found " << cameras_.size() << " cameras!");
     cameras_ready_ = true;
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
@@ -165,7 +165,7 @@ namespace multicam_calibration {
     ss << std::put_time(ptm, "%F-%H-%M-%S");
     return (base + "-" + ss.str() + ".yaml");
   }
-  
+
   bool CalibrationNodelet::calibrate(CalibrationCmd::Request& req,
                                      CalibrationCmd::Response &res) {
     calibrator_->runCalibration();
@@ -186,6 +186,7 @@ namespace multicam_calibration {
     
     ROS_INFO_STREAM("writing calibration to " << fullname);
     std::ofstream of(fullname);
+    updateCameras(results);
     writeCalibration(of, results);
     writeCalibration(std::cout, results);
     // test with poses from optimizer
@@ -390,6 +391,22 @@ namespace multicam_calibration {
     }
   }
 
+  void CalibrationNodelet::updateCameras(const CalibDataVec &results) {
+    for (const auto &cam_idx : irange(0ul, results.size())) {
+      const CalibrationData &cd = results[cam_idx];
+      const CameraIntrinsics &ci = cd.intrinsics;
+      CalibrationData &cam = cameras_[cam_idx];
+      if (isNonZero(cd.T_cam_imu)) {
+        cam.T_cam_imu = cd.T_cam_imu;
+      }
+      if (cam_idx > 0) {
+        cam.T_cn_cnm1 = cd.T_cn_cnm1;
+      }
+      cam.intrinsics.intrinsics = ci.intrinsics;
+      cam.intrinsics.distortion_coeffs = ci.distortion_coeffs;
+    }
+  }
+
   void CalibrationNodelet::subscribe() {
     switch (sub_.size()) {
     case 0:
@@ -547,7 +564,6 @@ namespace multicam_calibration {
         imagePoints_[camid][frank] = ip[i];
       }
     }
-
     
     for (unsigned int fnum = 0; fnum < worldPoints_[0].size(); fnum++) {
       CamWorldPoints wp;

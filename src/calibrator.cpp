@@ -35,20 +35,30 @@ namespace multicam_calibration {
   // maps parameters to parameter blocks
   // ------ parameter block layout --------
   //
-  // params[0]      = intrinsics for all cameras
-  // params[1]      = extrinsics cam1->cam0 (if cam1 exists)
+  // params[0]          = intrinsics for cam 0
+  //  ....
+  // params[ncam-1]     = intrinsics for cam n-1
+  //
+  // params[ncam]       = extrinsics cam1->cam0 (if cam1 exists)
   //     ...
-  // params[ncam-1] = extrinsics camn->cam0
-  // params[ncam]   = frame_tf
+  // params[2 * ncam-2] = extrinsics camn->cam0
+  // params[2 * ncam-1]   = frame_tf
 
   static std::vector<double *>
   params_to_blocks(const CalibDataVec &cdv, std::vector<double> &params,
                    unsigned int frame_num) {
     std::vector<double *> v;
     unsigned int num_cameras = cdv.size();
-       v.push_back(&params[0]); // intrinsics are the first block
+    unsigned int i = 0;
+    unsigned int offset = 0;
+    for (const auto &cd : cdv) {
+      v.push_back(&params[offset]); // intrinsics are the first block
+      // for each camera we have fx, fy, cx, cy + distortion coefficients;
+      offset += cd.intrinsics.intrinsics.size() + cd.intrinsics.distortion_coeffs.size();
+      i++;
+    }
     // number of intrinsic parameters for all cameras
-    unsigned int numIntrinsics = get_num_intrinsics(cdv);
+    unsigned int numIntrinsics = offset;
     // add the extrinsics between cam0 and the rest
     unsigned int totNumCameraParams = numIntrinsics + 6 * (num_cameras - 1);
     for (const auto iext : irange(0u, num_cameras - 1)) {
@@ -74,7 +84,7 @@ namespace multicam_calibration {
     template <typename T>
     bool operator()(T const *const *params, T *residual) const
       {
-        unsigned int frame_tf_idx   = cams_.size();
+        unsigned int frame_tf_idx   = cams_.size() * 2 - 1;
         const Vec<T, 3> R_vec_frame = Eigen::Map<const Vec<T, 3>>(&params[frame_tf_idx][0]);
         const Mat<T, 3, 3>  R_frame = rotation_matrix(R_vec_frame);
         const Vec<T, 3>     t_frame = Eigen::Map<const Vec<T, 3>>(&params[frame_tf_idx][3]);
@@ -85,15 +95,14 @@ namespace multicam_calibration {
           {
             const CalibrationData &cam = cams_[cam_idx];
             Mat<T, 3, 3> K = Mat<T, 3, 3>::Identity();
-            K(0, 0) = params[0][intrinsics_offset];
-            K(1, 1) = params[0][intrinsics_offset + 1];
-            K(0, 2) = params[0][intrinsics_offset + 2];
-            K(1, 2) = params[0][intrinsics_offset + 3];
+            K(0, 0) = params[cam_idx][0];
+            K(1, 1) = params[cam_idx][1];
+            K(0, 2) = params[cam_idx][2];
+            K(1, 2) = params[cam_idx][3];
             unsigned int numDist = cam.intrinsics.distortion_coeffs.size();
             DynVec<T> D(numDist);
             for(const auto i : irange(0u, numDist)) {
-              D(i) = params[0][intrinsics_offset +
-                               cam.intrinsics.intrinsics.size() + i];
+              D(i) = params[cam_idx][cam.intrinsics.intrinsics.size() + i];
             }
 
             Mat<T, 3, 3> R_cam;
@@ -106,15 +115,16 @@ namespace multicam_calibration {
             else
               {
                 // apply camera extrinsics wrt camera 0
+                unsigned int ext_param_num = cams_.size() + cam_idx - 1;
                 const Vec<T, 3> R_vec_cam =
-                  Eigen::Map<const Vec<T, 3>>(&params[cam_idx][0]);
+                  Eigen::Map<const Vec<T, 3>>(&params[ext_param_num][0]);
                 R_cam = rotation_matrix(R_vec_cam); // rotation vector
-                t_cam = Eigen::Map<const Vec<T, 3>>(&params[cam_idx][3]);
+                t_cam = Eigen::Map<const Vec<T, 3>>(&params[ext_param_num][3]);
                 std::cout.flush();
               }
 
             const Mat<T, 3, 3> R = R_cam * R_frame;
-            const Vec<T, 3> t = R_cam * t_frame + t_cam;
+            const Vec<T, 3>    t = R_cam * t_frame + t_cam;
             vector_aligned<Point2<T>> projected_points;
             if (cam.intrinsics.distortion_model == "equidistant") {
               projected_points = utils::project_frame_equidistant(world_points_[cam_idx], R, t, K, D);
@@ -124,13 +134,12 @@ namespace multicam_calibration {
               std::cout << "ERROR: unknown distortion model: " << cam.intrinsics.distortion_model << std::endl;
               return (false);
             }
-            for(const auto i : irange<size_t>(0, projected_points.size()))
-              {
-                residual[residual_count++] =
-                  projected_points[i].x - T(image_points_[cam_idx][i].x);
-                residual[residual_count++] =
-                  projected_points[i].y - T(image_points_[cam_idx][i].y);
-              }
+            for(const auto i : irange<size_t>(0, projected_points.size())) {
+              residual[residual_count++] =
+                projected_points[i].x - T(image_points_[cam_idx][i].x);
+              residual[residual_count++] =
+                projected_points[i].y - T(image_points_[cam_idx][i].y);
+            }
             intrinsics_offset += cam.intrinsics.intrinsics.size() +
               cam.intrinsics.distortion_coeffs.size();
           }
@@ -395,10 +404,15 @@ namespace multicam_calibration {
       auto cost_function = new ceres::DynamicAutoDiffCostFunction<FrameResidual>(
         new FrameResidual(frame_world_points, frame_image_points, calibrationData_));
       std::vector<double *> v = params_to_blocks(calibrationData_, params, i);
-      // Per camera intrinsics
-      cost_function->AddParameterBlock(numIntrinsics);
+      // per camera intrinsics
+      for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
+        const CalibrationData &cd = calibrationData_[cam_idx];
+        unsigned int nparam = cd.intrinsics.intrinsics.size() +
+          cd.intrinsics.distortion_coeffs.size();
+        cost_function->AddParameterBlock(nparam);
+      }
       // (ncam-1) extrinsics
-      for(unsigned int iext = 1; iext < calibrationData_.size(); iext++)  {
+      for (const auto iext: irange(1ul, calibrationData_.size())) { 
         cost_function->AddParameterBlock(6);
       }
       // Pose of cam0 wrt calib board
@@ -408,13 +422,18 @@ namespace multicam_calibration {
       cost_function->SetNumResiduals(2 * frame_num_points);
       problem.AddResidualBlock(cost_function, new ceres::HuberLoss(1.0), v);
 
-      // fix parameter blocks as requested
-      if (fixIntrinsics_) {
-        problem.SetParameterBlockConstant(v[0]);
+
+      // fix intrinsic parameters where requested
+      for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
+        const CalibrationData &cd = calibrationData_[cam_idx];
+        if (fixAllIntrinsics_ || cd.fixIntrinsics) {
+          problem.SetParameterBlockConstant(v[cam_idx]);
+        }
       }
-      for(const auto iext : irange(1ul, calibrationData_.size()))  {
+      // fix extrinsics where requested
+      for (const auto iext : irange(1ul, calibrationData_.size()))  {
         if (calibrationData_[iext].fixExtrinsics) {
-          problem.SetParameterBlockConstant(v[iext]);
+          problem.SetParameterBlockConstant(v[iext + calibrationData_.size() - 1]);
         }
       }
     }
