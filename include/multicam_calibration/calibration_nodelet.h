@@ -8,6 +8,7 @@
 
 #include "multicam_calibration/multicam_apriltag_detector.h"
 #include "multicam_calibration/CalibrationCmd.h"
+#include "multicam_calibration/ParameterCmd.h"
 #include "multicam_calibration/calibration_data.h"
 #include "multicam_calibration/calibrator.h"
 
@@ -48,6 +49,7 @@ namespace multicam_calibration {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     void onInit() override;
     bool calibrate(CalibrationCmd::Request& req,  CalibrationCmd::Response &res);
+    bool setParameter(ParameterCmd::Request& req,  ParameterCmd::Response &res);
 
   private:
     void callback1(ImageConstPtr const &img0);
@@ -86,6 +88,7 @@ namespace multicam_calibration {
     std::unique_ptr<ExactSynchronizer3> sync3_;
     std::unique_ptr<Calibrator> calibrator_;
     ros::ServiceServer calibrationService_;
+    ros::ServiceServer parameterService_;
     ros::Subscriber singleCamSub_;
     std::vector<CamWorldPoints>  worldPoints_; // worldPoints_[camidx][frameidx][pointidx]
     std::vector<CamImagePoints>  imagePoints_;

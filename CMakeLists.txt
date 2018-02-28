@@ -3,7 +3,7 @@ project(multicam_calibration)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_options(-Wall -fopenmp)
+add_compile_options(-Wall -fopenmp -g)
 
 find_package(catkin_simple REQUIRED)
 find_package(Ceres REQUIRED)

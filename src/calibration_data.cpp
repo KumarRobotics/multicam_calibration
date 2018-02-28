@@ -76,6 +76,9 @@ namespace multicam_calibration {
       if (!nh.getParam(cam + "/rostopic",  calibData.rostopic)) { bombout("rostopic", cam); }
       calibData.T_cam_imu = get_transform(nh, cam + "/T_cam_imu", zeros());
       calibData.T_cn_cnm1 = get_transform(nh, cam + "/T_cn_cnm1", identity());
+      nh.param<bool>(cam + "/fix_intrinsics",  calibData.fixIntrinsics, false);
+      nh.param<bool>(cam + "/fix_extrinsics",  calibData.fixExtrinsics, false);
+      nh.param<bool>(cam + "/active",          calibData.active, true);
       cdv.push_back(calibData);
     }
     return (cdv);

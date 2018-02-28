@@ -56,7 +56,7 @@ namespace multicam_calibration {
     nh.param<int>("skip_num_frames", skipFrames_, 1);
     bool fixIntrinsics;
     nh.param<bool>("fix_intrinsics", fixIntrinsics, false);
-    calibrator_->setFixIntrinsics(fixIntrinsics);
+    calibrator_->setFixAllIntrinsics(fixIntrinsics);
     
     image_transport::ImageTransport it(nh);
     for (const auto &camdata : cameras_) {
@@ -72,6 +72,7 @@ namespace multicam_calibration {
       tagCountPub_.push_back(nh.advertise<std_msgs::UInt32>(camdata.name + "/num_detected_tags", 1));
     }
     calibrationService_ = nh.advertiseService("calibration", &CalibrationNodelet::calibrate, this);
+    parameterService_ = nh.advertiseService("set_parameter", &CalibrationNodelet::setParameter, this);
     subscribe();
     std::string filename;
     if (nh.getParam("corners_file", filename)) {
@@ -81,7 +82,7 @@ namespace multicam_calibration {
           CalibrationCmd::Request rq;
           CalibrationCmd::Response rsp;
           calibrate(rq, rsp);
-          ros::shutdown();
+          //ros::shutdown();
         }
       } else {
         if (!filename.empty()) {
@@ -131,6 +132,7 @@ namespace multicam_calibration {
       
       nh.param<bool>(cam + "/fix_intrinsics",  calibData.fixIntrinsics, false);
       nh.param<bool>(cam + "/fix_extrinsics",  calibData.fixExtrinsics, false);
+      nh.param<bool>(cam + "/active",          calibData.active, true);
       if (cam_index == 0) {
         if (calibData.T_cn_cnm1 != identity()) {
           ROS_WARN_STREAM("Cam0 had a non-identity T_cn_cnm1 specified!");
@@ -148,7 +150,7 @@ namespace multicam_calibration {
       cameras_.push_back(calibData);
       worldPoints_.push_back(CamWorldPoints());
       imagePoints_.push_back(CamImagePoints());
-      calibrator_->addCamera(cam, calibData);
+      calibrator_->addCamera(calibData);
       ROS_INFO_STREAM("added camera: " << cam);
       cam_index++;
     }
@@ -200,6 +202,30 @@ namespace multicam_calibration {
     return (true);
   }
 
+  bool CalibrationNodelet::setParameter(ParameterCmd::Request& req,
+                                        ParameterCmd::Response &res) {
+    if (!calibrator_) {
+      ROS_WARN("calibrator not initialized, ignoring parameters!");
+      return (false);
+    }
+    switch (req.param) {
+    case 0: // fix intrinsics
+      calibrator_->setFixIntrinsics(req.camera, req.value);
+      break;
+    case 1: // fix extrinsics
+      calibrator_->setFixExtrinsics(req.camera, req.value);
+      break;
+    case 2: // set active/inactive
+      calibrator_->setCameraActive(req.camera, req.value);
+      break;
+    default:
+      ROS_ERROR_STREAM("invalid parameter: " << (int) req.param);
+      return (false);
+    }
+    calibrator_->showCameraStatus();
+    return (true);
+  }
+
   typedef std::pair<double, unsigned int> Stat;
   static double avg(const Stat &s) {
     return (s.second > 0 ? s.first/s.second : 0.0);
@@ -214,9 +240,9 @@ namespace multicam_calibration {
     Stat totErr;
     Stat maxErr;
     unsigned int  maxErrCam(0);
-    std::vector<Stat>   cameraStats(res[0].size(), Stat(0.0, 0));
+    std::vector<Stat>   cameraStats(calib.size(), Stat(0.0, 0));
     std::vector<std::ofstream> resFiles;
-    for (const auto cam_idx : irange(0ul, res[0].size())) {
+    for (const auto cam_idx : irange(0ul, calib.size())) {
       resFiles.push_back(std::ofstream("residuals_cam" + std::to_string(cam_idx) + ".txt"));
     }
     for (const auto fnum : irange(0ul, res.size())) {

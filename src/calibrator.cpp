@@ -104,41 +104,38 @@ namespace multicam_calibration {
             for(const auto i : irange(0u, numDist)) {
               D(i) = params[cam_idx][cam.intrinsics.intrinsics.size() + i];
             }
-
-            Mat<T, 3, 3> R_cam;
-            Vec<T, 3> t_cam;
-            if(cam_idx == 0)
-              {
+            if (cam.active) {
+              Mat<T, 3, 3> R_cam;
+              Vec<T, 3> t_cam;
+              if(cam_idx == 0) {
                 R_cam = Mat<T, 3, 3>::Identity();
                 t_cam = Vec<T, 3>::Zero();
-              }
-            else
-              {
+              } else {
                 // apply camera extrinsics wrt camera 0
                 unsigned int ext_param_num = cams_.size() + cam_idx - 1;
                 const Vec<T, 3> R_vec_cam =
                   Eigen::Map<const Vec<T, 3>>(&params[ext_param_num][0]);
                 R_cam = rotation_matrix(R_vec_cam); // rotation vector
                 t_cam = Eigen::Map<const Vec<T, 3>>(&params[ext_param_num][3]);
-                std::cout.flush();
               }
 
-            const Mat<T, 3, 3> R = R_cam * R_frame;
-            const Vec<T, 3>    t = R_cam * t_frame + t_cam;
-            vector_aligned<Point2<T>> projected_points;
-            if (cam.intrinsics.distortion_model == "equidistant") {
-              projected_points = utils::project_frame_equidistant(world_points_[cam_idx], R, t, K, D);
-            } else if (cam.intrinsics.distortion_model == "radtan") {
-              projected_points = utils::project_frame_radtan(world_points_[cam_idx], R, t, K, D);
-            } else {
-              std::cout << "ERROR: unknown distortion model: " << cam.intrinsics.distortion_model << std::endl;
-              return (false);
-            }
-            for(const auto i : irange<size_t>(0, projected_points.size())) {
-              residual[residual_count++] =
-                projected_points[i].x - T(image_points_[cam_idx][i].x);
-              residual[residual_count++] =
-                projected_points[i].y - T(image_points_[cam_idx][i].y);
+              const Mat<T, 3, 3> R = R_cam * R_frame;
+              const Vec<T, 3>    t = R_cam * t_frame + t_cam;
+              vector_aligned<Point2<T>> projected_points;
+              if (cam.intrinsics.distortion_model == "equidistant") {
+                projected_points = utils::project_frame_equidistant(world_points_[cam_idx], R, t, K, D);
+              } else if (cam.intrinsics.distortion_model == "radtan") {
+                projected_points = utils::project_frame_radtan(world_points_[cam_idx], R, t, K, D);
+              } else {
+                std::cout << "ERROR: unknown distortion model: " << cam.intrinsics.distortion_model << std::endl;
+                return (false);
+              }
+              for(const auto i : irange<size_t>(0, projected_points.size())) {
+                residual[residual_count++] =
+                  projected_points[i].x - T(image_points_[cam_idx][i].x);
+                residual[residual_count++] =
+                  projected_points[i].y - T(image_points_[cam_idx][i].y);
+              }
             }
             intrinsics_offset += cam.intrinsics.intrinsics.size() +
               cam.intrinsics.distortion_coeffs.size();
@@ -212,8 +209,24 @@ namespace multicam_calibration {
   }
 #endif
 
-  void Calibrator::addCamera(const std::string &name,
-                             const CalibrationData &calibData) {
+  int Calibrator::getCameraIndex(const std::string &cam) const {
+    for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
+      if (calibrationData_[cam_idx].name  == cam) return (cam_idx);
+    }
+    ROS_ERROR_STREAM("invalid camera specified: " << cam);
+    throw (std::runtime_error("invalid camera specified: " + cam));
+    return (-1);
+  }
+
+  void Calibrator::showCameraStatus() const {
+    for (const auto &cam: calibrationData_) {
+      ROS_INFO("%-10s: fix intr: %d, fix extr: %d, active: %d",
+               cam.name.c_str(), cam.fixIntrinsics,
+               cam.fixExtrinsics, cam.active);
+    }
+  }
+
+  void Calibrator::addCamera(const CalibrationData &calibData) {
     calibrationData_.push_back(calibData);
     worldPoints_.resize(calibrationData_.size());
     imagePoints_.resize(calibrationData_.size());
@@ -308,21 +321,27 @@ namespace multicam_calibration {
       for (const auto cam_idx : irange(0u, num_cameras)) {
         frame_world_points.push_back(worldPoints_[cam_idx][fnum]);
         frame_image_points.push_back(imagePoints_[cam_idx][fnum]);
-        frame_num_points += frame_world_points[cam_idx].size();
+        if (calibrationData_[cam_idx].active) {
+          frame_num_points += frame_world_points[cam_idx].size();
+        }
       }
-      const auto fr = FrameResidual(frame_world_points, frame_image_points,
-                                    calibrationData_);
-      const unsigned numResiduals = 2 * frame_num_points;
-      std::vector<double> residuals(numResiduals);
-      // point offset to cam0 pose for this particular frame
-      std::vector<double *> params = params_to_blocks(calibrationData_, params_, fnum);
-      fr(&params[0], residuals.data());
-      // unpack residuals into vector of vectors of vectors
       res.push_back(std::vector<std::vector<Vec2d>>()); // empty for this frame
-      for (const auto cam_idx : irange(0u, num_cameras)) {
-        res.back().push_back(std::vector<Vec2d>()); // empty for this camera
-        for (const auto res_idx : irange(0u, (unsigned int)worldPoints_[cam_idx][fnum].size())) {
-          res.back().back().push_back(Vec2d(residuals[res_idx * 2], residuals[res_idx * 2 + 1]));
+      if (frame_num_points > 0) {
+        const auto fr = FrameResidual(frame_world_points, frame_image_points,
+                                      calibrationData_);
+        const unsigned numResiduals = 2 * frame_num_points;
+        std::vector<double> residuals(numResiduals);
+        // point offset to cam0 pose for this particular frame
+        std::vector<double *> params = params_to_blocks(calibrationData_, params_, fnum);
+        fr(&params[0], residuals.data());
+        // unpack residuals into vector of vectors of vectors
+        for (const auto cam_idx : irange(0u, num_cameras)) {
+          res.back().push_back(std::vector<Vec2d>()); // empty for this camera
+          if (calibrationData_[cam_idx].active) {
+            for (const auto res_idx : irange(0u, (unsigned int)worldPoints_[cam_idx][fnum].size())) {
+              res.back().back().push_back(Vec2d(residuals[res_idx * 2], residuals[res_idx * 2 + 1]));
+            }
+          }
         }
       }
     }
@@ -386,9 +405,6 @@ namespace multicam_calibration {
     const unsigned int num_frames = worldPoints_[0].size();
     const unsigned int num_cameras = calibrationData_.size();
 
-    // number of intrinsic parameters for all cameras
-    unsigned int numIntrinsics = get_num_intrinsics(calibrationData_);
-
     //
     // Create one FrameResidual for each frame
     //
@@ -399,7 +415,13 @@ namespace multicam_calibration {
       for(const auto cam_idx : irange(0u, num_cameras)) {
         frame_world_points.push_back(worldPoints_[cam_idx][i]);
         frame_image_points.push_back(imagePoints_[cam_idx][i]);
-        frame_num_points += frame_world_points[cam_idx].size();
+        if (calibrationData_[cam_idx].active) {
+          frame_num_points += frame_world_points[cam_idx].size();
+        }
+      }
+      if (frame_num_points == 0) {
+        // none of the active cameras sees any points in this frame!
+        continue;
       }
       auto cost_function = new ceres::DynamicAutoDiffCostFunction<FrameResidual>(
         new FrameResidual(frame_world_points, frame_image_points, calibrationData_));
@@ -412,7 +434,8 @@ namespace multicam_calibration {
         cost_function->AddParameterBlock(nparam);
       }
       // (ncam-1) extrinsics
-      for (const auto iext: irange(1ul, calibrationData_.size())) { 
+      for (const auto iext: irange(1ul, calibrationData_.size())) {
+        (void)iext;
         cost_function->AddParameterBlock(6);
       }
       // Pose of cam0 wrt calib board

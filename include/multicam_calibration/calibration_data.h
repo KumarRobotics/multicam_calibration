@@ -28,6 +28,7 @@ namespace multicam_calibration {
     int               tagCount{0};
     bool              fixIntrinsics{false};
     bool              fixExtrinsics{false};
+    bool              active{true};
     // 
     static CalibDataVec parse_cameras(const ros::NodeHandle &nh);
   };
