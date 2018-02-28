@@ -170,6 +170,7 @@ namespace multicam_calibration {
 
   bool CalibrationNodelet::calibrate(CalibrationCmd::Request& req,
                                      CalibrationCmd::Response &res) {
+    calibrator_->showCameraStatus();
     calibrator_->runCalibration();
     CalibDataVec results = calibrator_->getCalibrationResults();
     if (results.empty()) {
@@ -210,19 +211,21 @@ namespace multicam_calibration {
     }
     switch (req.param) {
     case 0: // fix intrinsics
+      ROS_INFO("fix intrinsics for cam %s:  %d", req.camera.c_str(), (int)req.value);
       calibrator_->setFixIntrinsics(req.camera, req.value);
       break;
     case 1: // fix extrinsics
+      ROS_INFO("fix extrinsics for cam %s:  %d", req.camera.c_str(), (int)req.value);
       calibrator_->setFixExtrinsics(req.camera, req.value);
       break;
     case 2: // set active/inactive
+      ROS_INFO("setting active camera  %s:  %d", req.camera.c_str(), (int)req.value);
       calibrator_->setCameraActive(req.camera, req.value);
       break;
     default:
       ROS_ERROR_STREAM("invalid parameter: " << (int) req.param);
       return (false);
     }
-    calibrator_->showCameraStatus();
     return (true);
   }
 
