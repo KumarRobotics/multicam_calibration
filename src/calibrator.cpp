@@ -209,15 +209,6 @@ namespace multicam_calibration {
   }
 #endif
 
-  int Calibrator::getCameraIndex(const std::string &cam) const {
-    for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
-      if (calibrationData_[cam_idx].name  == cam) return (cam_idx);
-    }
-    ROS_ERROR_STREAM("invalid camera specified: " << cam);
-    throw (std::runtime_error("invalid camera specified: " + cam));
-    return (-1);
-  }
-
   void Calibrator::showCameraStatus() const {
     for (const auto &cam: calibrationData_) {
       ROS_INFO("%-10s: fix intr: %d, fix extr: %d, active: %d",
@@ -226,14 +217,16 @@ namespace multicam_calibration {
     }
   }
 
-  void Calibrator::addCamera(const CalibrationData &calibData) {
-    calibrationData_.push_back(calibData);
-    worldPoints_.resize(calibrationData_.size());
-    imagePoints_.resize(calibrationData_.size());
+  void Calibrator::setCameras(const CalibDataVec &calibData) {
+    calibrationData_ = calibData;
   }
 
   void Calibrator::addPoints(int frameNum, const CamWorldPoints &wp, const CamImagePoints &ip,
                              const CameraExtrinsics &cam0PoseGuess) {
+    if (worldPoints_.empty()) {
+      worldPoints_.resize(calibrationData_.size());
+      imagePoints_.resize(calibrationData_.size());
+    }
     if (wp.size() != calibrationData_.size() ||
         ip.size() != calibrationData_.size()) {
       std::cerr << "number of cams != width of array!" << std::endl;
@@ -287,6 +280,9 @@ namespace multicam_calibration {
       std::cerr << "no data to run on!" << std::endl;
       return;
     }
+    ROS_INFO_STREAM("camera status at start:");
+    showCameraStatus();
+
     params_.clear();
     initializeVariables(&params_);
     ceres::Problem problem;

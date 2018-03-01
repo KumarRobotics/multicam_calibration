@@ -79,10 +79,13 @@ namespace multicam_calibration {
       if (readPointsFromFile(filename)) {
         if (!worldPoints_.empty()) {
           ROS_INFO_STREAM("read " << worldPoints_[0].size() << " frames from " << filename);
-          CalibrationCmd::Request rq;
-          CalibrationCmd::Response rsp;
-          calibrate(rq, rsp);
-          //ros::shutdown();
+          bool runCalibOnInit(false);
+          nh.param<bool>("run_calib_on_init", runCalibOnInit, false);
+          if (runCalibOnInit) {
+            CalibrationCmd::Request rq;
+            CalibrationCmd::Response rsp;
+            calibrate(rq, rsp);
+          }
         }
       } else {
         if (!filename.empty()) {
@@ -114,7 +117,6 @@ namespace multicam_calibration {
       std::string cam = "cam" + std::to_string(cam_index);
       XmlRpc::XmlRpcValue lines;
       if (!nh.getParam(cam, lines)) break; // no more cameras!
-      ROS_INFO_STREAM("Parsing " << cam);
       CalibrationData calibData;
       calibData.name = cam;
       CameraIntrinsics &ci = calibData.intrinsics;
@@ -150,10 +152,9 @@ namespace multicam_calibration {
       cameras_.push_back(calibData);
       worldPoints_.push_back(CamWorldPoints());
       imagePoints_.push_back(CamImagePoints());
-      calibrator_->addCamera(calibData);
-      ROS_INFO_STREAM("added camera: " << cam);
       cam_index++;
     }
+    calibrator_->setCameras(cameras_);
     ROS_INFO_STREAM("Found " << cameras_.size() << " cameras!");
     cameras_ready_ = true;
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
@@ -170,6 +171,7 @@ namespace multicam_calibration {
 
   bool CalibrationNodelet::calibrate(CalibrationCmd::Request& req,
                                      CalibrationCmd::Response &res) {
+    calibrator_->setCameras(cameras_);
     calibrator_->showCameraStatus();
     calibrator_->runCalibration();
     CalibDataVec results = calibrator_->getCalibrationResults();
@@ -190,6 +192,7 @@ namespace multicam_calibration {
     ROS_INFO_STREAM("writing calibration to " << fullname);
     std::ofstream of(fullname);
     updateCameras(results);
+    calibrator_->setCameras(cameras_);
     writeCalibration(of, results);
     writeCalibration(std::cout, results);
     // test with poses from optimizer
@@ -203,24 +206,27 @@ namespace multicam_calibration {
     return (true);
   }
 
+  int CalibrationNodelet::getCameraIndex(const std::string &cam) const {
+    for (const auto cam_idx : irange(0ul, cameras_.size())) {
+      if (cameras_[cam_idx].name  == cam) return (cam_idx);
+    }
+    ROS_ERROR_STREAM("invalid camera specified: " << cam);
+    throw (std::runtime_error("invalid camera specified: " + cam));
+    return (-1);
+  }
+
   bool CalibrationNodelet::setParameter(ParameterCmd::Request& req,
                                         ParameterCmd::Response &res) {
-    if (!calibrator_) {
-      ROS_WARN("calibrator not initialized, ignoring parameters!");
-      return (false);
-    }
+    int cam_idx = getCameraIndex(req.camera);
     switch (req.param) {
     case 0: // fix intrinsics
-      ROS_INFO("fix intrinsics for cam %s:  %d", req.camera.c_str(), (int)req.value);
-      calibrator_->setFixIntrinsics(req.camera, req.value);
+      cameras_[cam_idx].fixIntrinsics = req.value;
       break;
     case 1: // fix extrinsics
-      ROS_INFO("fix extrinsics for cam %s:  %d", req.camera.c_str(), (int)req.value);
-      calibrator_->setFixExtrinsics(req.camera, req.value);
+      cameras_[cam_idx].fixExtrinsics = req.value;
       break;
     case 2: // set active/inactive
-      ROS_INFO("setting active camera  %s:  %d", req.camera.c_str(), (int)req.value);
-      calibrator_->setCameraActive(req.camera, req.value);
+      cameras_[cam_idx].active = req.value;
       break;
     default:
       ROS_ERROR_STREAM("invalid parameter: " << (int) req.param);
@@ -650,14 +656,6 @@ namespace multicam_calibration {
     publishDebugImages(msg_vec, detected_tags);
     publishTagCounts();
     frameNum_++;
-#if 0    
-    if (frameNum_ > 1) {
-      CalibrationCmd::Request req;
-      req.calibration = 0;
-      CalibrationCmd::Response res;
-      calibrate(req, res);
-    }
-#endif    
   }
 
   void CalibrationNodelet::publishDebugImages(const std::vector<ImageMsg::ConstPtr> &msg_vec,

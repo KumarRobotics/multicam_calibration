@@ -20,17 +20,8 @@ namespace multicam_calibration {
     using Vec2d = Eigen::Matrix<double, 2, 1>;
     using Residuals = std::vector<std::vector<std::vector<Vec2d>>>;
     void setFixAllIntrinsics(bool f) { fixAllIntrinsics_ = f; }
-    void setFixIntrinsics(const std::string &cam, bool f) {
-      calibrationData_[getCameraIndex(cam)].fixIntrinsics = f;
-    }
-    void setFixExtrinsics(const std::string &cam, bool f) {
-      calibrationData_[getCameraIndex(cam)].fixExtrinsics = f;
-    }
-    void setCameraActive(const std::string &cam, bool f) {
-      calibrationData_[getCameraIndex(cam)].active = f;
-    }
     void showCameraStatus() const;
-    void addCamera(const CalibrationData &calibData);
+    void setCameras(const CalibDataVec &calibData);
     void addPoints(int frameNum, const CamWorldPoints &wp, const CamImagePoints &ip,
                    const CameraExtrinsics &cam0InitPose);
     void runCalibration();
@@ -39,7 +30,6 @@ namespace multicam_calibration {
     void testCalibration(Residuals *resptr);
 
   private:
-    int getCameraIndex(const std::string &cam) const;
     void initializeVariables(std::vector<double> *param_ptr);
     void setupOptimizationProblem(ceres::Problem *prob, std::vector<double> *vars);
     

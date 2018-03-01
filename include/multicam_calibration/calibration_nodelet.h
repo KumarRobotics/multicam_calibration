@@ -69,6 +69,7 @@ namespace multicam_calibration {
     void homographyTest(const CalibDataVec &results) const;
     void testCalibration(const CalibDataVec &calib);
     void updateCameras(const CalibDataVec &results);
+    int  getCameraIndex(const std::string &cam) const;
 
     bool readPointsFromFile(const std::string &fname);
     // ---------- variables
