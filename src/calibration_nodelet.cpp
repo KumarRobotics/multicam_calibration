@@ -23,7 +23,7 @@ namespace multicam_calibration {
     ss << std::put_time(ptm, "%F-%H-%M-%S");
     return (base + "-" + ss.str() + ext);
   }
-  
+
   static CameraExtrinsics get_kalibr_style_transform(const ros::NodeHandle &nh,
                                                      const std::string &field) {
     CameraExtrinsics T;
@@ -67,10 +67,9 @@ namespace multicam_calibration {
     nh.param<int>("skip_num_frames", skipFrames_, 1);
     bool fixIntrinsics;
     nh.param<bool>("fix_intrinsics", fixIntrinsics, false);
+    calibrator_->setFixAllIntrinsics(fixIntrinsics);
     nh.param<bool>("record_bag", record_bag_, false);
     nh.param<std::string>("bag_base", bag_file_, std::string("~/.ros/multicam_calibration"));
-    calibrator_->setFixAllIntrinsics(fixIntrinsics);
-
     if (record_bag_) {
       std::string fname = make_filename(bag_file_, ".bag");
       output_bag_.open(fname, rosbag::bagmode::Write);
