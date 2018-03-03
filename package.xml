@@ -20,6 +20,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>roscpp</depend>
+  <depend>rosbag</depend>
   <depend>eigen_conversions</depend>
   <depend>tf2_ros</depend>
   <depend>libceres-dev</depend>

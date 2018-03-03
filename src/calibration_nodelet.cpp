@@ -15,6 +15,15 @@
 namespace multicam_calibration {
   using boost::irange;
 
+  static std::string make_filename(const std::string &base, const std::string& ext = ".yaml") {
+    using std::chrono::system_clock;
+    std::time_t tt = system_clock::to_time_t(system_clock::now());
+    struct std::tm * ptm = std::localtime(&tt);
+    std::stringstream ss;
+    ss << std::put_time(ptm, "%F-%H-%M-%S");
+    return (base + "-" + ss.str() + ext);
+  }
+
   static CameraExtrinsics get_kalibr_style_transform(const ros::NodeHandle &nh,
                                                      const std::string &field) {
     CameraExtrinsics T;
@@ -52,11 +61,19 @@ namespace multicam_calibration {
     }
     nh.getParam("use_approximate_sync", use_approximate_sync_);
     ROS_INFO_STREAM((use_approximate_sync_ ? "" : "not ") <<  "using approximate sync");
+    std::string filename;
+    nh.param("corners_file", filename, std::string(""));
     detector_.reset(new MultiCamApriltagDetector(nh));
     nh.param<int>("skip_num_frames", skipFrames_, 1);
     bool fixIntrinsics;
     nh.param<bool>("fix_intrinsics", fixIntrinsics, false);
     calibrator_->setFixAllIntrinsics(fixIntrinsics);
+    nh.param<bool>("record_bag", record_bag_, true);
+    nh.param<std::string>("bag_base", bag_file_, std::string("~/.ros/multicam_calibration"));
+    if (record_bag_) {
+      std::string fname = make_filename(bag_file_, ".bag");
+      output_bag_.open(fname, rosbag::bagmode::Write);
+    }
     
     image_transport::ImageTransport it(nh);
     for (const auto &camdata : cameras_) {
@@ -74,8 +91,7 @@ namespace multicam_calibration {
     calibrationService_ = nh.advertiseService("calibration", &CalibrationNodelet::calibrate, this);
     parameterService_ = nh.advertiseService("set_parameter", &CalibrationNodelet::setParameter, this);
     subscribe();
-    std::string filename;
-    if (nh.getParam("corners_file", filename)) {
+    if (!filename.empty()) {
       if (readPointsFromFile(filename)) {
         if (!worldPoints_.empty()) {
           ROS_INFO_STREAM("read " << worldPoints_[0].size() << " frames from " << filename);
@@ -160,15 +176,6 @@ namespace multicam_calibration {
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
 
-  static std::string make_filename(const std::string &base) {
-    using std::chrono::system_clock;
-    std::time_t tt = system_clock::to_time_t(system_clock::now());
-    struct std::tm * ptm = std::localtime(&tt);
-    std::stringstream ss;
-    ss << std::put_time(ptm, "%F-%H-%M-%S");
-    return (base + "-" + ss.str() + ".yaml");
-  }
-
   bool CalibrationNodelet::calibrate(CalibrationCmd::Request& req,
                                      CalibrationCmd::Response &res) {
     calibrator_->setCameras(cameras_);
@@ -203,6 +210,14 @@ namespace multicam_calibration {
     if (std::system(NULL) && std::system(cmd.c_str())) {
       ROS_ERROR_STREAM("link command failed: " << cmd);
     }
+
+    // close the bag
+    if (record_bag_) {
+      output_bag_.close();
+      // reopen for appending - what else to do here? start a new bag?      
+      output_bag_.open(output_bag_.getFileName(), rosbag::bagmode::Append);
+    }
+    
     return (true);
   }
 
@@ -623,6 +638,7 @@ namespace multicam_calibration {
     }
     CamWorldPoints wp;
     CamImagePoints ip;
+    
     std::vector<apriltag_ros::ApriltagVec> detected_tags =
       detector_->process(msg_vec, &wp, &ip);
     ROS_ASSERT(msg_vec.size() == detected_tags.size());
@@ -634,6 +650,15 @@ namespace multicam_calibration {
       ROS_WARN("no detections found, skipping frame!");
       return;
     }
+
+    // don't record frames with no detections
+    if (record_bag_) {
+      for (size_t i = 0; i < cameras_.size(); ++i) {
+        auto& img = msg_vec[i];
+        output_bag_.write(cameras_[i].rostopic, img->header.stamp, *img);
+      }
+    }
+    
     calibrator_->addPoints(frameNum_, wp, ip, cam0Pose);
 
     // add new frames to each camera

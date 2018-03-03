@@ -10,18 +10,21 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include "multicam_calibration/types.h"
+#include <string>
 
 namespace multicam_calibration {
   using sensor_msgs::ImageConstPtr;
   class MultiCamApriltagDetector {
   public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    MultiCamApriltagDetector(ros::NodeHandle &nh);
+    MultiCamApriltagDetector(ros::NodeHandle &nh,
+                             const std::string& filename = "corners.csv");
     
     std::vector<apriltag_ros::ApriltagVec> process(
       std::vector<ImageConstPtr> const &msg_vec,
       CamWorldPoints *wp, CamImagePoints *ip);
             
+    //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   private:
     struct Point2f {
       float x;

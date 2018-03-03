@@ -19,6 +19,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <nodelet/nodelet.h>
 #include <ros/ros.h>
+#include <rosbag/bag.h>
 #include <iostream>
 
 
@@ -100,6 +101,9 @@ namespace multicam_calibration {
     int skipCount_{0};
     int skipFrames_{1};
     bool cameras_ready_;
+    bool record_bag_;
+    std::string bag_file_;
+    rosbag::Bag output_bag_;
   };
 }
 #include <pluginlib/class_list_macros.h>
