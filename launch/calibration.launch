@@ -1,6 +1,7 @@
 <launch>
   <arg name="calib_dir" default="$(find multicam_calibration)/calib/example"/>
   <arg name="device" default="example_camera"/>
+  <arg name="record_bag" default="false"/>
   <node pkg="nodelet" type="nodelet"
     name="multicam_calibration" args="standalone multicam_calibration/CalibrationNodelet"
     clear_params="true" output="screen">
@@ -10,6 +11,7 @@
     <param name="calib_dir" value="$(arg calib_dir)"/>
     <param name="latest_link_name" value="$(arg device)-latest.yaml"/>
     <param name="output_filename" value="$(arg device)"/>
+    <param name="record_bag" value="$(arg record_bag)"/>
 
     <!--
 	You can just perform the calibration from an extracted corners file (~/.ros/corners.csv)
