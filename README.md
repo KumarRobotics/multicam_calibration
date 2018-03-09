@@ -16,6 +16,11 @@ You will need the following packages in your ROS workspace:
 	git clone https://github.com/versatran01/apriltag.git
 
 
+And probably libceres:
+
+	sudo apt install libceres-dev
+
+
 What else you are missing you'll find out now:
 
 	cd catkin_ws
