@@ -1,0 +1,128 @@
+type is multicam_calibration/CalibrationNodelet
+[0m[ INFO] [1521297843.441190288]: Found 1 cameras![0m
+[0m[ INFO] [1521297843.442108957]: not using approximate sync[0m
+[0m[ INFO] [1521297843.444651778]: writing extracted corners to file corners.csv[0m
+read 900 frames from corners file for cam 0
+[0m[ INFO] [1521297843.756619597]: camid 0 read frames: 900[0m
+[0m[ INFO] [1521297843.756886966]: total number of frames: 900[0m
+read 900 frames from corners file for cam 0
+[0m[ INFO] [1521297844.239831949]: read 900 frames from /home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/test/radtan/corners.csv[0m
+[0m[ INFO] [1521297844.241128683]: cam0      : fix intr: 0, fix extr: 0, active: 1[0m
+[0m[ INFO] [1521297844.241141120]: camera status at start:[0m
+[0m[ INFO] [1521297844.241147555]: cam0      : fix intr: 0, fix extr: 0, active: 1[0m
+Num params: 5412
+Num residuals: 715662
+iter      cost      cost_change  |gradient|   |step|    tr_ratio  tr_radius  ls_iter  iter_time  total_time
+   0  3.753430e-01    0.00e+00    2.29e+04   0.00e+00   0.00e+00  1.00e+04        0    4.27e-01    4.84e-01
+   1  6.909148e-06    3.75e-01    1.78e+00   1.54e-03   1.00e+00  3.00e+04        1    9.58e-01    1.44e+00
+   2  6.808999e-06    1.00e-07    1.28e-02   2.22e-04   1.00e+00  9.00e+04        1    7.82e-01    2.22e+00
+   3  6.741513e-06    6.75e-08    7.61e-03   4.05e-04   1.00e+00  2.70e+05        1    7.89e-01    3.01e+00
+   4  6.701133e-06    4.04e-08    2.52e-03   4.62e-04   1.00e+00  8.10e+05        1    7.93e-01    3.81e+00
+   5  6.694080e-06    7.05e-09    4.78e-04   2.42e-04   1.00e+00  2.43e+06        1    7.93e-01    4.60e+00
+   6  6.693676e-06    4.04e-10    1.44e-04   4.80e-05   1.00e+00  7.29e+06        1    7.88e-01    5.39e+00
+   7  6.693400e-06    2.76e-10    8.59e-05   3.11e-06   1.00e+00  2.19e+07        1    7.90e-01    6.18e+00
+   8  6.693219e-06    1.81e-10    3.44e-05   1.76e-06   1.00e+00  6.56e+07        1    7.92e-01    6.97e+00
+   9  6.693186e-06    3.25e-11    6.12e-06   9.62e-07   1.00e+00  1.97e+08        1    7.95e-01    7.77e+00
+  10  6.693185e-06    1.07e-12    4.10e-07   1.96e-07   1.00e+00  5.90e+08        1    7.90e-01    8.56e+00
+  11  6.693185e-06    5.01e-15    6.94e-08   1.39e-08   1.01e+00  1.77e+09        1    7.96e-01    9.35e+00
+
+Solver Summary (v 1.12.0-eigen-(3.2.92)-lapack-suitesparse-(4.4.6)-cxsparse-(3.1.4)-openmp)
+
+                                     Original                  Reduced
+Parameter blocks                          901                      901
+Parameters                               5412                     5412
+Residual blocks                           900                      900
+Residual                               715662                   715662
+
+Minimizer                        TRUST_REGION
+
+Sparse linear algebra library    SUITE_SPARSE
+Trust region strategy     LEVENBERG_MARQUARDT
+
+                                        Given                     Used
+Linear solver          SPARSE_NORMAL_CHOLESKY   SPARSE_NORMAL_CHOLESKY
+Threads                                     4                        4
+Linear solver threads                       1                        1
+Linear solver ordering              AUTOMATIC                      901
+
+Cost:
+Initial                          3.753430e-01
+Final                            6.693185e-06
+Change                           3.753363e-01
+
+Minimizer iterations                       12
+Successful steps                           12
+Unsuccessful steps                          0
+
+Time (in seconds):
+Preprocessor                           0.0572
+
+  Residual evaluation                  0.2033
+  Jacobian evaluation                  4.3472
+  Linear solver                        4.6195
+Minimizer                              9.7066
+
+Postprocessor                          0.0000
+Total                                  9.7639
+
+Termination:                      CONVERGENCE (Parameter tolerance reached. Relative step_norm: 9.110088e-13 <= 1.000000e-12.)
+
+[0m[ INFO] [1521297854.021895994]: writing calibration to /home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/test/radtan/radtan-2018-03-17-10-44-14.yaml[0m
+cam0:
+  camera_model: pinhole
+  intrinsics: [151, 152, 173, 144]
+  distortion_model: radtan
+  distortion_coeffs: [0.155003, -0.180002, -0.005, -0.000300001, 0.0440008, 0.00500274, 0.00399778, -0.000399239]
+  resolution: [352, 287]
+  rostopic: /cam/image_raw
+[0m[ INFO] [1521297855.814403017]: ----------------- reprojection errors: ---------------[0m
+[0m[ INFO] [1521297855.814439732]: total error:     6.11635e-06 px[0m
+[0m[ INFO] [1521297855.814447374]: avg error cam 0: 6.11635e-06 px[0m
+[0m[ INFO] [1521297855.814454418]: max error: 2.37361e-05 px at frame: 84 for cam: 0[0m
+[0m[ INFO] [1521297855.865236344]: -------------- simple homography test ---------[0m
+[0m[ INFO] [1521297856.094448058]: camera: 0 points: 357831 reproj err: 0.00144828[0m
+... logging to /home/pfrommer/.ros/log/a2f60fe0-28a0-11e8-be3c-f85971518dda/roslaunch-robotics-31750.log
+Checking log directory for disk usage. This may take awhile.
+Press Ctrl-C to interrupt
+Done checking log file disk usage. Usage is <1GB.
+]2;/home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/launch/test_radtan.launch
+[1mstarted roslaunch server http://robotics:40913/[0m
+
+SUMMARY
+========
+
+CLEAR PARAMETERS
+ * /multicam_calibration/
+
+PARAMETERS
+ * /multicam_calibration/calib_dir: /home/pfrommer/Do...
+ * /multicam_calibration/cam0/camera_model: pinhole
+ * /multicam_calibration/cam0/distortion_coeffs: [0.155, -0.18, -0...
+ * /multicam_calibration/cam0/distortion_model: radtan
+ * /multicam_calibration/cam0/intrinsics: [151, 152, 173, 144]
+ * /multicam_calibration/cam0/resolution: [352, 287]
+ * /multicam_calibration/cam0/rostopic: /cam/image_raw
+ * /multicam_calibration/corners_file: /home/pfrommer/Do...
+ * /multicam_calibration/fix_intrinsics: False
+ * /multicam_calibration/latest_link_name: radtan-latest.yaml
+ * /multicam_calibration/output_filename: radtan
+ * /multicam_calibration/run_calib_on_init: True
+ * /multicam_calibration/tagCols: 7
+ * /multicam_calibration/tagRows: 5
+ * /multicam_calibration/tagSize: 0.04
+ * /multicam_calibration/tagSpacing: 0.25
+ * /multicam_calibration/target_type: aprilgrid
+ * /rosdistro: kinetic
+ * /rosversion: 1.12.12
+
+NODES
+  /
+    multicam_calibration (nodelet/nodelet)
+
+[1mROS_MASTER_URI=http://localhost:11311[0m
+]2;/home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/launch/test_radtan.launch http://localhost:11311
+[1mprocess[multicam_calibration-1]: started with pid [31768][0m
+[multicam_calibration-1] killing on exit
+shutting down processing monitor...
+... shutting down processing monitor complete
+[1mdone[0m

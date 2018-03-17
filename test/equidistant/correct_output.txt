@@ -1,0 +1,127 @@
+type is multicam_calibration/CalibrationNodelet
+[0m[ INFO] [1521299569.579331477]: Found 1 cameras![0m
+[0m[ INFO] [1521299569.580358834]: not using approximate sync[0m
+[0m[ INFO] [1521299569.582703117]: writing extracted corners to file corners.csv[0m
+read 900 frames from corners file for cam 0
+[0m[ INFO] [1521299569.894689484]: camid 0 read frames: 900[0m
+[0m[ INFO] [1521299569.895448098]: total number of frames: 900[0m
+read 900 frames from corners file for cam 0
+[0m[ INFO] [1521299570.399209388]: read 900 frames from /home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/test/equidistant/corners.csv[0m
+[0m[ INFO] [1521299570.400510203]: cam0      : fix intr: 0, fix extr: 0, active: 1[0m
+[0m[ INFO] [1521299570.400540392]: camera status at start:[0m
+[0m[ INFO] [1521299570.400546363]: cam0      : fix intr: 0, fix extr: 0, active: 1[0m
+Num params: 5408
+Num residuals: 720000
+iter      cost      cost_change  |gradient|   |step|    tr_ratio  tr_radius  ls_iter  iter_time  total_time
+   0  8.718698e-04    0.00e+00    2.08e+01   0.00e+00   0.00e+00  1.00e+04        0    4.90e-01    5.35e-01
+   1  6.404429e-06    8.65e-04    3.45e-03   6.58e-05   1.00e+00  3.00e+04        1    8.91e-01    1.43e+00
+   2  6.403967e-06    4.63e-10    4.96e-04   1.95e-06   1.00e+00  9.00e+04        1    7.16e-01    2.14e+00
+   3  6.403808e-06    1.59e-10    1.38e-04   8.61e-06   1.00e+00  2.70e+05        1    7.17e-01    2.86e+00
+   4  6.403780e-06    2.80e-11    2.15e-05   1.16e-05   1.00e+00  8.10e+05        1    7.18e-01    3.58e+00
+   5  6.403777e-06    2.76e-12    1.99e-06   5.61e-06   1.00e+00  2.43e+06        1    7.14e-01    4.29e+00
+   6  6.403777e-06    6.25e-14    8.97e-08   9.58e-07   1.00e+00  7.29e+06        1    7.16e-01    5.01e+00
+   7  6.403777e-06    1.17e-16    5.13e-09   5.59e-08   8.73e-01  1.25e+07        1    7.19e-01    5.73e+00
+   8  6.403777e-06   -4.14e-17    0.00e+00   1.09e-09  -1.35e+01  6.24e+06        1    3.04e-01    6.03e+00
+
+Solver Summary (v 1.12.0-eigen-(3.2.92)-lapack-suitesparse-(4.4.6)-cxsparse-(3.1.4)-openmp)
+
+                                     Original                  Reduced
+Parameter blocks                          901                      901
+Parameters                               5408                     5408
+Residual blocks                           900                      900
+Residual                               720000                   720000
+
+Minimizer                        TRUST_REGION
+
+Sparse linear algebra library    SUITE_SPARSE
+Trust region strategy     LEVENBERG_MARQUARDT
+
+                                        Given                     Used
+Linear solver          SPARSE_NORMAL_CHOLESKY   SPARSE_NORMAL_CHOLESKY
+Threads                                     4                        4
+Linear solver threads                       1                        1
+Linear solver ordering              AUTOMATIC                      901
+
+Cost:
+Initial                          8.718698e-04
+Final                            6.403777e-06
+Change                           8.654660e-04
+
+Minimizer iterations                        9
+Successful steps                            8
+Unsuccessful steps                          1
+
+Time (in seconds):
+Preprocessor                           0.0448
+
+  Residual evaluation                  0.2989
+  Jacobian evaluation                  3.2422
+  Linear solver                        2.3989
+Minimizer                              6.2844
+
+Postprocessor                          0.0000
+Total                                  6.3293
+
+Termination:                      CONVERGENCE (Function tolerance reached. |cost_change|/cost: 6.871470e-13 <= 1.000000e-12)
+
+[0m[ INFO] [1521299576.745549878]: writing calibration to /home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/test/equidistant/equidistant-2018-03-17-11-12-56.yaml[0m
+cam0:
+  camera_model: pinhole
+  intrinsics: [151, 152, 173, 144]
+  distortion_model: equidistant
+  distortion_coeffs: [0.155, -0.180001, -0.00499917, -0.000300337]
+  resolution: [352, 287]
+  rostopic: /cam/image_raw
+[0m[ INFO] [1521299578.613801394]: ----------------- reprojection errors: ---------------[0m
+[0m[ INFO] [1521299578.613838223]: total error:     5.96461e-06 px[0m
+[0m[ INFO] [1521299578.613847195]: avg error cam 0: 5.96461e-06 px[0m
+[0m[ INFO] [1521299578.613873291]: max error: 1.99193e-05 px at frame: 9 for cam: 0[0m
+[0m[ INFO] [1521299578.664327865]: -------------- simple homography test ---------[0m
+[0m[ INFO] [1521299578.899363950]: camera: 0 points: 360000 reproj err: 6.96242e-05[0m
+... logging to /home/pfrommer/.ros/log/a2f60fe0-28a0-11e8-be3c-f85971518dda/roslaunch-robotics-3039.log
+Checking log directory for disk usage. This may take awhile.
+Press Ctrl-C to interrupt
+Done checking log file disk usage. Usage is <1GB.
+]2;/home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/launch/test_calib.launch
+[1mstarted roslaunch server http://robotics:40483/[0m
+
+SUMMARY
+========
+
+CLEAR PARAMETERS
+ * /multicam_calibration/
+
+PARAMETERS
+ * /multicam_calibration/calib_dir: /home/pfrommer/Do...
+ * /multicam_calibration/cam0/camera_model: pinhole
+ * /multicam_calibration/cam0/distortion_coeffs: [0.155, -0.18, -0...
+ * /multicam_calibration/cam0/distortion_model: equidistant
+ * /multicam_calibration/cam0/intrinsics: [151, 152, 173, 144]
+ * /multicam_calibration/cam0/resolution: [352, 287]
+ * /multicam_calibration/cam0/rostopic: /cam/image_raw
+ * /multicam_calibration/corners_file: /home/pfrommer/Do...
+ * /multicam_calibration/fix_intrinsics: False
+ * /multicam_calibration/latest_link_name: equidistant-lates...
+ * /multicam_calibration/output_filename: equidistant
+ * /multicam_calibration/run_calib_on_init: True
+ * /multicam_calibration/tagCols: 7
+ * /multicam_calibration/tagRows: 5
+ * /multicam_calibration/tagSize: 0.04
+ * /multicam_calibration/tagSpacing: 0.25
+ * /multicam_calibration/target_type: aprilgrid
+ * /rosdistro: kinetic
+ * /rosversion: 1.12.12
+
+NODES
+  /
+    multicam_calibration (nodelet/nodelet)
+
+[1mROS_MASTER_URI=http://localhost:11311[0m
+]2;/home/pfrommer/Documents/falcam_rigging/src/multicam_calibration/launch/test_calib.launch http://localhost:11311
+[1mprocess[multicam_calibration-1]: started with pid [3057][0m
+[1m[multicam_calibration-1] process has finished cleanly
+log file: /home/pfrommer/.ros/log/a2f60fe0-28a0-11e8-be3c-f85971518dda/multicam_calibration-1*.log[0m
+all processes on machine have died, roslaunch will exit
+shutting down processing monitor...
+... shutting down processing monitor complete
+[1mdone[0m
