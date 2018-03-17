@@ -180,3 +180,7 @@ In the ``calib/example`` directory you can now find the output of the calibratio
 	example_camera-2018-01-11-08-24-22.yaml
 	example_camera-initial.yaml
 	example_camera-latest.yaml
+
+## Unit tests
+
+For testing the calibration, refer to [this page][test/README.md].
