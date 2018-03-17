@@ -102,7 +102,7 @@ namespace multicam_calibration {
     Point2<T> project_point_radtan(const Vec<T, 3> &X_world,
                                    const Mat<T, 3, 3> &R, const Vec<T, 3> &t,
                                    const Mat<T, 3, 3> &K,
-                                   const DynVec<T> &D) {
+                                   const DynVec<T> &D_in) {
       const Vec<T, 3> X = R * X_world + t;
       T x(X(0)/X(2));
       T y(X(1)/X(2));
@@ -111,26 +111,18 @@ namespace multicam_calibration {
       T xy  =  x * y;
       T rsq = x2 + y2;
       T r4  = rsq * rsq;
-
-      T numerator = T{1.0} + D[0] * rsq + D[1] * r4;
-      T denom     = T{1.0};
-
-      if (D.size() > 4) {
-        T r6  = rsq * r4;
-        numerator += D[4] * r6;
-        if (D.size() > 5) {
-          denom += D[5] * rsq;
-          if (D.size() > 6) {
-            denom += D[6] * r4;
-          }
-          if (D.size() > 7) {
-            denom += D[7] * r6;
-          }
-        }
+      T r6  = rsq * r4;
+      DynVec<T> D(8);
+      for (int i = 0; i < 8; i++) {
+        D(i) = (i < D_in.size()) ? D_in(i) : T{0.0};
       }
+
+      T numerator = T{1.0} + D[0]*rsq  + D[1]*r4 + D[4]*r6;
+      T denom     = T{1.0} + D[5]*rsq  + D[6]*r4 + D[7]*r6;
+
       T ratio = numerator / denom;
       T xpp = x * ratio + T{2.0} * D[2] * xy                  + D[3] * (rsq + T{2.0} * x2);
-      T ypp = y * ratio + T{2.0} * D[2] * (rsq + T{2.0} * y2) + D[3] * xy;
+      T ypp = y * ratio +          D[2] * (rsq + T{2.0} * y2) + D[3] * T{2} * xy;
 
       const Vec<T, 3> x_dn{xpp, ypp, T{1.0}};
       const Vec<T, 3> x_dp = K * x_dn;
