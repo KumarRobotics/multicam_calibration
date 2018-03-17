@@ -183,4 +183,4 @@ In the ``calib/example`` directory you can now find the output of the calibratio
 
 ## Unit tests
 
-For testing the calibration, refer to [this page][test/README.md].
+For testing the calibration, refer to [this page](test/README.md).
