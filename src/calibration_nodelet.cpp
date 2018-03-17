@@ -102,6 +102,7 @@ namespace multicam_calibration {
             CalibrationCmd::Request rq;
             CalibrationCmd::Response rsp;
             calibrate(rq, rsp);
+            ros::shutdown();
           }
         }
       } else {
@@ -282,7 +283,6 @@ namespace multicam_calibration {
           const auto &ip = imagePoints_[cam_idx][fnum][res_idx];
           Calibrator::Vec2d dp(ip.x - calib[cam_idx].intrinsics.intrinsics[2],
                                ip.y - calib[cam_idx].intrinsics.intrinsics[3]);
-                   
           resFiles[cam_idx] << wp.x << " " << wp.y << " "
                             << ip.x << " " << ip.y << " "
                             << dp(0) << " " << dp(1) << " "
