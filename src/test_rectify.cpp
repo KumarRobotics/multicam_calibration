@@ -84,7 +84,7 @@ namespace multicam_calibration {
         cv::cvtColor(cv_ptr->image, img, cv::COLOR_GRAY2BGR);
       }
       tags[i] = detector_->Detect(cv_ptr->image);
-      apriltag_ros::RefineApriltags(cv_ptr->image, tags[i]);
+      //apriltag_ros::RefineApriltags(cv_ptr->image, tags[i]);
     }
 
 

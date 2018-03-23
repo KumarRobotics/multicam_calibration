@@ -68,7 +68,7 @@ namespace multicam_calibration {
       cv::Mat const img = cv_ptr->image;
       // detect & refine
       auto img_apriltags = detector_->Detect(img);
-      apriltag_ros::RefineApriltags(img, img_apriltags);
+      //apriltag_ros::RefineApriltags(img, img_apriltags);
       detected_tags[cam_idx] = img_apriltags;
       // Store
       worldPoints->push_back(FrameWorldPoints());

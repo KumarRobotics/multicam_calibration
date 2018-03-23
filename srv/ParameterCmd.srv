@@ -5,3 +5,5 @@ uint8 param
 string camera
 bool  value
 ---
+bool success
+string message

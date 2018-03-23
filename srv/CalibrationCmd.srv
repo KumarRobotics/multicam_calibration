@@ -1,4 +1,0 @@
-uint8 CALIBRATE_CAM0_CAM1=0
-uint8 CALIBRATE_CAM0_CAM2=1
-uint8 calibration
----

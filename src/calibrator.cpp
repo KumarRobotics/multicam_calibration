@@ -276,8 +276,8 @@ namespace multicam_calibration {
   }
 
   void Calibrator::runCalibration() {
-    if (calibrationData_.empty()) {
-      std::cerr << "no data to run on!" << std::endl;
+    if (calibrationData_.empty() || worldPoints_.empty()) {
+      ROS_ERROR("no data to run on!");
       return;
     }
     ROS_INFO_STREAM("camera status at start:");
@@ -345,7 +345,7 @@ namespace multicam_calibration {
 
   CalibDataVec Calibrator::getCalibrationResults() const {
     CalibDataVec res;
-    if (calibrationData_.empty()) {
+    if (calibrationData_.empty() || worldPoints_.empty()) {
       return (res);
     }
     const CameraExtrinsics &T_cam0_imu = calibrationData_[0].T_cam_imu;

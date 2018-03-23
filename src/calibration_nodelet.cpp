@@ -99,8 +99,8 @@ namespace multicam_calibration {
           bool runCalibOnInit(false);
           nh.param<bool>("run_calib_on_init", runCalibOnInit, false);
           if (runCalibOnInit) {
-            CalibrationCmd::Request rq;
-            CalibrationCmd::Response rsp;
+            std_srvs::Trigger::Request rq;
+            std_srvs::Trigger::Response rsp;
             calibrate(rq, rsp);
             ros::shutdown();
           }
@@ -178,15 +178,17 @@ namespace multicam_calibration {
     T_imu_body_ = get_transform(nh, "T_imu_body", zeros());
   }
 
-  bool CalibrationNodelet::calibrate(CalibrationCmd::Request& req,
-                                     CalibrationCmd::Response &res) {
+  bool CalibrationNodelet::calibrate(std_srvs::Trigger::Request& req,
+                                     std_srvs::Trigger::Response &res) {
     calibrator_->setCameras(cameras_);
     calibrator_->showCameraStatus();
     calibrator_->runCalibration();
     CalibDataVec results = calibrator_->getCalibrationResults();
     if (results.empty()) {
       ROS_ERROR("empty calibration results, no file written!");
-      return (false);
+      res.message = "no data for calibration!";
+      res.success = false;
+      return (true);
     }
     std::string baseName, linkName, calibDir, resultsDir;
     ros::NodeHandle nh = getPrivateNodeHandle();
@@ -234,18 +236,24 @@ namespace multicam_calibration {
   bool CalibrationNodelet::setParameter(ParameterCmd::Request& req,
                                         ParameterCmd::Response &res) {
     int cam_idx = getCameraIndex(req.camera);
+    res.success = true;
     switch (req.param) {
     case 0: // fix intrinsics
       cameras_[cam_idx].fixIntrinsics = req.value;
+      res.message = "fix intrinsics successful";
       break;
     case 1: // fix extrinsics
       cameras_[cam_idx].fixExtrinsics = req.value;
+      res.message = "fix extrinsics successful";
       break;
     case 2: // set active/inactive
       cameras_[cam_idx].active = req.value;
+      res.message = "set active successful";
       break;
     default:
       ROS_ERROR_STREAM("invalid parameter: " << (int) req.param);
+      res.success = false;
+      res.message = "invalid parameter";
       return (false);
     }
     return (true);

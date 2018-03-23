@@ -7,7 +7,6 @@
 #define MULTICAM_CALIBRATION_CALIBRATION_NODELET_H
 
 #include "multicam_calibration/multicam_apriltag_detector.h"
-#include "multicam_calibration/CalibrationCmd.h"
 #include "multicam_calibration/ParameterCmd.h"
 #include "multicam_calibration/calibration_data.h"
 #include "multicam_calibration/calibrator.h"
@@ -20,6 +19,7 @@
 #include <nodelet/nodelet.h>
 #include <ros/ros.h>
 #include <rosbag/bag.h>
+#include <std_srvs/Trigger.h>
 #include <iostream>
 
 
@@ -49,7 +49,7 @@ namespace multicam_calibration {
   public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     void onInit() override;
-    bool calibrate(CalibrationCmd::Request& req,  CalibrationCmd::Response &res);
+    bool calibrate(std_srvs::Trigger::Request& req,  std_srvs::Trigger::Response &res);
     bool setParameter(ParameterCmd::Request& req,  ParameterCmd::Response &res);
 
   private:

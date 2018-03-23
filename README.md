@@ -57,7 +57,6 @@ Adjust the topics to match your camera sources.
 You must use an aprilgrid target for calibration, layout follows Kalibr conventions and 
 is specified in ``config/aprilgrid.yaml``.
 
-
 Then launch the camera calibration:
 
 	roslaunch multicam_calibration calibration.launch
@@ -89,7 +88,7 @@ You should see the tags detected, and output like this on the terminal:
 
 When you think you have enough frames collected, you can start the calibration:
 
-	rosservice call /multicam_calibration/calibration 1
+	rosservice call /multicam_calibration/calibration
 	
 This should give you output like this:
 
@@ -181,6 +180,47 @@ In the ``calib/example`` directory you can now find the output of the calibratio
 	example_camera-initial.yaml
 	example_camera-latest.yaml
 
+## Managed calibrations
+
+Sometimes a calibration consists of a sequence of steps, for example: first the
+intrinsics of each sensor, then the extrinsics of the sensors with
+respect to each other. This is particularly useful when image data
+between sensors is not synchronized.
+
+To help with this, you can write a little python program that does
+that. In fact, you just have to modify the section below in
+``src/example_calib_manager.py``, and voila, when you trigger your
+calibration manager, it will in turn run multiple calibrations via
+service calls into the calibration node, each time retaining the
+previous calibration's output as initial value. Here is an example
+section, adjust as needed:
+
+        # first do intrinsics of cam0
+        set_p(FIX_INTRINSICS, "cam0", False)
+        set_p(FIX_EXTRINSICS, "cam0", True)
+        set_p(SET_ACTIVE,     "cam0", True)
+        set_p(FIX_INTRINSICS, "cam1", True)
+        set_p(FIX_EXTRINSICS, "cam1", True)
+        set_p(SET_ACTIVE,     "cam1", False)
+        run_cal()
+        # then do intrinsics of cam1
+        set_p(FIX_INTRINSICS, "cam0", True)
+        set_p(FIX_EXTRINSICS, "cam0", True)
+        set_p(SET_ACTIVE,     "cam0", False)
+        set_p(FIX_INTRINSICS, "cam1", False)
+        set_p(FIX_EXTRINSICS, "cam1", True)
+        set_p(SET_ACTIVE,     "cam1", True)
+        run_cal()
+        # now extrinsics between the two
+        set_p(FIX_INTRINSICS, "cam0", True)
+        set_p(FIX_EXTRINSICS, "cam0", True)
+        set_p(SET_ACTIVE,     "cam0", True)
+        set_p(FIX_INTRINSICS, "cam1", True)
+        set_p(FIX_EXTRINSICS, "cam1", False)
+        set_p(SET_ACTIVE,     "cam1", True)
+        run_cal()
+
 ## Unit tests
 
-For testing the calibration, refer to [this page](test/README.md).
+For unit testing of the calibration code, refer to [this page](test/README.md).
+

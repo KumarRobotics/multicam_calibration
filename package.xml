@@ -19,6 +19,7 @@
   <depend>nodelet</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>roscpp</depend>
   <depend>rosbag</depend>
   <depend>eigen_conversions</depend>
