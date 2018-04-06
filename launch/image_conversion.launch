@@ -1,0 +1,8 @@
+<launch>
+  <node pkg="nodelet" type="nodelet"
+    name="image_conversion" args="standalone multicam_calibration/ImageConversionNodelet"
+    clear_params="true" output="screen">
+    <!-- example usage for xtion IR projector -->
+    <remap from="~image" to="/camera/ir/image"/>
+  </node>
+</launch>

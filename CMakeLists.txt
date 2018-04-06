@@ -43,6 +43,11 @@ cs_add_executable(test_rectify_node
 target_link_libraries(test_rectify_node
   ${CATKIN_LIBRARIES})
 
+cs_add_library(image_conversion_nodelet
+  src/image_conversion_nodelet.cpp)
+target_link_libraries(image_conversion_nodelet
+  ${CATKIN_LIBRARIES})
+  
 cs_install()
 install(FILES nodelet_plugin.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

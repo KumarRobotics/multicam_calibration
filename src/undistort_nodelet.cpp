@@ -21,20 +21,23 @@ namespace multicam_calibration {
       ROS_WARN("no camera info received yet!");
       return;
     }
-    bool isBayer = (img->encoding == "bayer_rggb8");
-    bool outputColor = isBayer;
-    std::string target_encoding = isBayer ?
-      sensor_msgs::image_encodings::BGR8 :
-      sensor_msgs::image_encodings::MONO8;
-    cv::Mat im = cv_bridge::toCvCopy(img, target_encoding)->image;
-    
-    cv::Mat rectim;
-    cv::remap(im, rectim, mapx_, mapy_, cv::INTER_LINEAR);
-    std::string output_encoding = outputColor ? "bgr8" : "mono8";
-    imagePub_.publish(cv_bridge::CvImage(img->header, output_encoding,
-                                         rectim).toImageMsg());
+    if (imagePub_getNumSubscribers() > 0) {
+      bool isBayer = (img->encoding == "bayer_rggb8");
+      bool outputColor = isBayer;
+      std::string target_encoding = isBayer ?
+        sensor_msgs::image_encodings::BGR8 :
+        sensor_msgs::image_encodings::MONO8;
+      cv::Mat im = cv_bridge::toCvCopy(img, target_encoding)->image;
+      cv::Mat rectim;
+      cv::remap(im, rectim, mapx_, mapy_, cv::INTER_LINEAR);
+      std::string output_encoding = outputColor ? "bgr8" : "mono8";
+      imagePub_.publish(cv_bridge::CvImage(img->header, output_encoding,
+                                           rectim).toImageMsg());
+    }
     cameraInfo_.header = img->header;
-    cameraInfoPub_.publish(cameraInfo_);
+    if (cameraInfoPub_.getNumSubscribers() > 0) {
+      cameraInfoPub_.publish(cameraInfo_);
+    }
   }
 
   void UndistortNodelet::cameraInfoCallback(const CameraInfoConstPtr &camInfo) {

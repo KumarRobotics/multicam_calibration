@@ -16,3 +16,12 @@
     </description>
   </class>
 </library>
+<library path="lib/libimage_conversion_nodelet">
+  <class name="multicam_calibration/ImageConversionNodelet"
+         type="multicam_calibration::ImageConversionNodelet"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      image conversion nodelet
+    </description>
+  </class>
+</library>
