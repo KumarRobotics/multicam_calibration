@@ -197,7 +197,7 @@ namespace multicam_calibration {
     nh.param<std::string>("calib_dir", calibDir, "calib");
     nh.param<std::string>("results_dir", resultsDir, "");
 
-    std::string fname = resultsDir + make_filename(baseName);
+    std::string fname = resultsDir + "/" + make_filename(baseName);
     std::string fullname = calibDir + "/" + fname;
     
     ROS_INFO_STREAM("writing calibration to " << fullname);
@@ -656,6 +656,7 @@ namespace multicam_calibration {
     CameraExtrinsics cam0Pose;
     if (!guessCameraPose(wp, ip, &cam0Pose)) {
       ROS_WARN("no detections found, skipping frame!");
+      publishDebugImages(msg_vec, detected_tags);
       return;
     }
 
