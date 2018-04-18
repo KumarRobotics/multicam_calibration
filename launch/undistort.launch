@@ -1,8 +1,9 @@
 <launch>
   <arg name="cam" default="/sync/cam0"/>
+  <arg name="name" default="undistort"/>
   <node pkg="nodelet" type="nodelet"
-    name="undistort" args="standalone multicam_calibration/UndistortNodelet"
-    clear_params="true" output="screen">
+    name="$(arg name)" args="standalone multicam_calibration/UndistortNodelet"
+    clear_params="false" output="screen">
     <remap from="~image" to="$(arg cam)/image_raw"/>
     <remap from="~camera_info_raw" to="$(arg cam)/camera_info"/> 
   </node>

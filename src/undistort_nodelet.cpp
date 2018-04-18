@@ -21,7 +21,7 @@ namespace multicam_calibration {
       ROS_WARN("no camera info received yet!");
       return;
     }
-    if (imagePub_getNumSubscribers() > 0) {
+    if (imagePub_.getNumSubscribers() > 0) {
       bool isBayer = (img->encoding == "bayer_rggb8");
       bool outputColor = isBayer;
       std::string target_encoding = isBayer ?

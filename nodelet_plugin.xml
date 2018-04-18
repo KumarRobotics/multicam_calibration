@@ -25,3 +25,12 @@
     </description>
   </class>
 </library>
+<library path="lib/libundistort_nodelet">
+  <class name="multicam_calibration/UndistortNodelet"
+         type="multicam_calibration::UndistortNodelet"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      equidistant undistortion nodelet
+    </description>
+  </class>
+</library>
