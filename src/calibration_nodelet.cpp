@@ -73,7 +73,10 @@ namespace multicam_calibration {
     if (record_bag_) {
       std::string fname = make_filename(bag_file_, ".bag");
       output_bag_.open(fname, rosbag::bagmode::Write);
-      bagIsOpen_ = true;
+      bagIsOpen_ = output_bag_.isOpen();
+      if (!bagIsOpen_) {
+        ROS_ERROR_STREAM("cannot open bag file: " << fname);
+      }
     }
     
     image_transport::ImageTransport it(nh);
@@ -655,7 +658,7 @@ namespace multicam_calibration {
     // incremental solver.
     CameraExtrinsics cam0Pose;
     if (!guessCameraPose(wp, ip, &cam0Pose)) {
-      ROS_WARN("no detections found, skipping frame!");
+      ROS_WARN_STREAM_THROTTLE(10, "no detections found, skipping frame ");
       publishDebugImages(msg_vec, detected_tags);
       return;
     }
