@@ -73,10 +73,15 @@ namespace multicam_calibration {
     if (record_bag_) {
       std::string fname = make_filename(bag_file_, ".bag");
       output_bag_.open(fname, rosbag::bagmode::Write);
+#ifdef TEST_IF_OPEN
+      // this does not build under kinetic, but under lunar?
       bagIsOpen_ = output_bag_.isOpen();
       if (!bagIsOpen_) {
         ROS_ERROR_STREAM("cannot open bag file: " << fname);
       }
+#else
+      bagIsOpen_ = true;
+#endif
     }
     
     image_transport::ImageTransport it(nh);
