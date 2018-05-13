@@ -3,7 +3,7 @@ project(multicam_calibration)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_options(-Wall -fopenmp -g)
+add_compile_options(-Wall)
 
 find_package(catkin_simple REQUIRED)
 find_package(Ceres REQUIRED)
@@ -52,7 +52,7 @@ cs_add_library(undistort_nodelet
   src/undistort_nodelet.cpp)
 target_link_libraries(undistort_nodelet
   ${CATKIN_LIBRARIES})
-  
+
 cs_install()
 install(FILES nodelet_plugin.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
