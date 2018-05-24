@@ -11,6 +11,7 @@
 #include <std_msgs/UInt32.h>
 #include <sstream>
 #include <boost/range/irange.hpp>
+#include <opencv2/core/eigen.hpp>
 
 namespace multicam_calibration {
   using boost::irange;
@@ -423,25 +424,84 @@ namespace multicam_calibration {
     return (ss.str());
   }
 
-  static void print_tf(std::ostream &os, const std::string &p, const CameraExtrinsics &T) {
+  template <typename T>
+  static void print_tf(std::ostream &os, const std::string &p, const T &tf) {
     os << std::fixed << std::setprecision(11);
     const int w = 14;
-    for (unsigned int i = 0; i < 4; i++) {
-      os << p << "- [" << std::setw(w) << T(i,0) << ", " << std::setw(w) << T(i,1) << ", " << std::setw(w) << T(i,2) << ", " << std::setw(w) << T(i,3) << "]" << std::endl;
+    for (unsigned int i = 0; i < tf.rows(); i++) {
+      os << p << "- [";
+      for (unsigned int j = 0; j < tf.cols() - 1; j++) {
+        os << std::setw(w) << tf(i,j) << ", ";
+      }
+      os << std::setw(w) << tf(i, tf.cols() - 1) << "] " << std::endl;
     }
   }
+
+  static bool compute_RPQ(unsigned int cam1_idx, unsigned int cam2_idx,
+                          const CalibDataVec &calib,
+                          cv::Mat *R1, cv::Mat *R2,
+                          cv::Mat *P1, cv::Mat *P2, cv::Mat *Q) {
+    // only compute stereo transformations for the first two cameras
+    if (cam1_idx >= calib.size() || cam2_idx >= calib.size()) {
+      return (false);
+    }
+    const auto &ci1 = calib[cam1_idx].intrinsics;
+    const auto &ci2 = calib[cam2_idx].intrinsics;
+    const auto &distm = ci1.distortion_model;
+    // they must have same distortion model and resolution
+    if (distm != ci2.distortion_model ||
+        ci1.resolution[0] != ci2.resolution[0] ||
+        ci1.resolution[1] != ci2.resolution[1]) {
+      return (false);
+    }
+    const cv::Mat K1 = get_init_pose::make_intrinsic_matrix(ci1.intrinsics);
+    const cv::Mat K2 = get_init_pose::make_intrinsic_matrix(ci2.intrinsics);
+    cv::Affine3f::Vec3 rvec, tvec;
+    get_init_pose::tf_to_rvec_tvec(calib[cam2_idx].T_cn_cnm1, &rvec, &tvec);
+    
+    if (distm == "equidistant") {
+      cv::fisheye::stereoRectify(K1, ci1.distortion_coeffs, K2, ci2.distortion_coeffs,
+                                 cv::Size(ci1.resolution[0], ci2.resolution[1]),
+                                 rvec, tvec, *R1, *R2, *P1, *P2, *Q, CV_CALIB_ZERO_DISPARITY);
+    } else if (distm == "radtan" || distm == "plumb_bob") {
+      // XXX never tested!
+      cv::stereoRectify(K1, ci1.distortion_coeffs, K2, ci2.distortion_coeffs,
+                        cv::Size(ci1.resolution[0], ci2.resolution[1]),
+                        rvec, tvec, *R1, *R2, *P1, *P2, *Q);
+    } else {
+      throw (std::runtime_error("unknown distortion model: " + distm));
+    }
+    return (true);
+  }
+
   
   void CalibrationNodelet::writeCalibration(std::ostream &os, const CalibDataVec &results) {
+    cv::Mat R[2], P[2], Q;
+    const unsigned int STEREO_CAM_0 = 0;
+    const unsigned int STEREO_CAM_1 = 1;
+    bool hasRP = compute_RPQ(STEREO_CAM_0, STEREO_CAM_1, results,
+                             &R[0], &R[1], &P[0], &P[1], &Q);
     for (unsigned int cam_idx = 0; cam_idx < results.size(); cam_idx++) {
       const CalibrationData &cd = results[cam_idx];
       os << cd.name << ":" << std::endl;
       if (isNonZero(cd.T_cam_imu)) {
         os << "  T_cam_imu:" << std::endl;
-        print_tf(os, "  ", cd.T_cam_imu);
+        print_tf<CameraExtrinsics>(os, "  ", cd.T_cam_imu);
       }
       if (cam_idx > 0) {
         os << "  T_cn_cnm1:" << std::endl;
-        print_tf(os, "  ", cd.T_cn_cnm1);
+        print_tf<CameraExtrinsics>(os, "  ", cd.T_cn_cnm1);
+      }
+      if (hasRP && (cam_idx == STEREO_CAM_0 || cam_idx == STEREO_CAM_1)) {
+        unsigned int rp_idx = cam_idx == STEREO_CAM_0 ? 0 : 1;
+        Eigen::Matrix<double, 3,3> Re;
+        Eigen::Matrix<double, 3,4> Pe;
+        cv::cv2eigen(R[rp_idx], Re);
+        cv::cv2eigen(P[rp_idx], Pe);
+        os << "  rectification_matrix:" << std::endl;
+        print_tf<Eigen::Matrix<double, 3,3>>(os, "  ", Re);
+        os << "  projection_matrix:" << std::endl;
+        print_tf<Eigen::Matrix<double, 3,4>>(os, "  ", Pe);
       }
       const CameraIntrinsics &ci = cd.intrinsics;
       os << "  camera_model: " << ci.camera_model << std::endl;
@@ -453,7 +513,7 @@ namespace multicam_calibration {
     }
     if (isNonZero(T_imu_body_)) {
       os << "T_imu_body:" << std::endl;
-      print_tf(os, "  ", T_imu_body_);
+      print_tf<CameraExtrinsics>(os, "  ", T_imu_body_);
     }
   }
 
