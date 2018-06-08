@@ -512,7 +512,8 @@ namespace multicam_calibration {
     }
   }
 
-  bool CalibrationNodelet::guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *T_0_w) const {
+  bool CalibrationNodelet::guessCameraPose(const CamWorldPoints &wp,
+					   const CamImagePoints &ip, CameraExtrinsics *T_0_w, int frameNum) const {
     CameraExtrinsics T_n_0 = identity();
     bool poseFound(false);
     for (unsigned int cam_idx = 0; cam_idx < cameras_.size(); cam_idx++) {
@@ -528,12 +529,12 @@ namespace multicam_calibration {
           *T_0_w = T_n_0.inverse() * T_n_w;
           poseFound = true;
         } else {
-          // XXX issue warning if error is too big!
           CameraExtrinsics T_0_w_test = T_n_0.inverse() * T_n_w;
           CameraExtrinsics T_err = T_0_w_test.inverse() * (*T_0_w);
           double rot_err = 1.5 - 0.5 *(T_err(0,0) + T_err(1,1) + T_err(2,2));
           if (rot_err > 0.25) {
-            ROS_WARN_STREAM("init tf for camera " << cam_idx << " is off from your initial .yaml file!");
+            ROS_WARN_STREAM("init tf for camera " << cam_idx << " frame " << frameNum <<
+			    " is off from your initial .yaml file!");
             ROS_WARN_STREAM("expected T_n_0 from " << cam_idx << " to cam 0 is roughly:");
             ROS_WARN_STREAM(T_n_w * T_0_w->inverse());
           }
@@ -639,7 +640,7 @@ namespace multicam_calibration {
         ip.push_back(imagePoints_[camid][fnum]);
       }
       CameraExtrinsics cam0Pose;
-      if (!guessCameraPose(wp, ip, &cam0Pose)) {
+      if (!guessCameraPose(wp, ip, &cam0Pose, fnum)) {
         ROS_WARN_STREAM("no detections found, skipping frame " << fnum);
         continue;
       }
@@ -662,7 +663,7 @@ namespace multicam_calibration {
     // At this point one could add the data points to an
     // incremental solver.
     CameraExtrinsics cam0Pose;
-    if (!guessCameraPose(wp, ip, &cam0Pose)) {
+    if (!guessCameraPose(wp, ip, &cam0Pose, frameNum_)) {
       ROS_WARN_STREAM_THROTTLE(10, "no detections found, skipping frame ");
       publishDebugImages(msg_vec, detected_tags);
       return;
