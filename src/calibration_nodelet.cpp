@@ -204,7 +204,7 @@ namespace multicam_calibration {
     nh.param<std::string>("output_filename", baseName, "calibration_output");
     nh.param<std::string>("latest_link_name", linkName, "latest.yaml");
     nh.param<std::string>("calib_dir", calibDir, "calib");
-    nh.param<std::string>("results_dir", resultsDir, "");
+    nh.param<std::string>("results_dir", resultsDir, ".");
 
     std::string fname = resultsDir + "/" + make_filename(baseName);
     std::string fullname = calibDir + "/" + fname;
