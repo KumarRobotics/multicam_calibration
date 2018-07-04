@@ -65,7 +65,7 @@ namespace multicam_calibration {
     void publishDebugImages(const std::vector<ImageConstPtr> &msg_vec,
                             const std::vector<apriltag_ros::ApriltagVec> &detected_tags);
     void publishTagCounts();
-    bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf) const;
+    bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf, int frameNum) const;
     void writeCalibration(std::ostream &os, const CalibDataVec &results);
     void homographyTest(const CalibDataVec &results) const;
     void testCalibration(const CalibDataVec &calib);
