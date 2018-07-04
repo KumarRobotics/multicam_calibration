@@ -27,10 +27,11 @@ namespace multicam_calibration {
 
     ros::Subscriber             cameraInfoSub_;
     ros::Publisher              cameraInfoPub_;
-    sensor_msgs::CameraInfo     cameraInfo_;
+    sensor_msgs::CameraInfo     undistortedCameraInfo_;
     image_transport::Subscriber imageSub_;
     image_transport::Publisher  imagePub_;
-
+    double                      fovScale_{1.0};
+    double                      balance_{0.0};
     cv::Mat mapx_;
     cv::Mat mapy_;
   };

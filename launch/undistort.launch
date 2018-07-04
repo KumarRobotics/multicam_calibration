@@ -3,8 +3,11 @@
   <arg name="name" default="undistort"/>
   <node pkg="nodelet" type="nodelet"
     name="$(arg name)" args="standalone multicam_calibration/UndistortNodelet"
-    clear_params="false" output="screen">
+    clear_params="true" output="screen">
     <remap from="~image" to="$(arg cam)/image_raw"/>
-    <remap from="~camera_info_raw" to="$(arg cam)/camera_info"/> 
+    <remap from="~camera_info_raw" to="$(arg cam)/camera_info"/>
+    <!-- for balance and fov_scale see opencv fisheye documentation -->
+    <param name="balance" value="0.0"/>
+    <param name="fov_scale" value="2.0"/>
   </node>
 </launch>
