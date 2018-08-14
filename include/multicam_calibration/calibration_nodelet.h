@@ -107,7 +107,4 @@ namespace multicam_calibration {
     rosbag::Bag output_bag_;
   };
 }
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(multicam_calibration::CalibrationNodelet, nodelet::Nodelet)
-
 #endif

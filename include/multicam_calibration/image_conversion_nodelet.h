@@ -23,7 +23,4 @@ namespace multicam_calibration {
     image_transport::Publisher  imagePub_;
   };
 }
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(multicam_calibration::ImageConversionNodelet, nodelet::Nodelet)
-
 #endif

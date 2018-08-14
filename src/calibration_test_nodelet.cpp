@@ -289,3 +289,6 @@ namespace multicam_calibration {
     process(msg_vec);
   }
 }
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(multicam_calibration::CalibrationTestNodelet, nodelet::Nodelet)

@@ -82,3 +82,6 @@ namespace multicam_calibration {
     cameraInfoSub_.shutdown();
   }
 }
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(multicam_calibration::UndistortNodelet, nodelet::Nodelet)

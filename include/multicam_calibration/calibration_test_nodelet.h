@@ -72,7 +72,4 @@ namespace multicam_calibration {
     bool useFileIntrinsics_{false};
   };
 }
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(multicam_calibration::CalibrationTestNodelet, nodelet::Nodelet)
-
 #endif
