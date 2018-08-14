@@ -9,7 +9,7 @@ find_package(catkin_simple REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
 
-include_directories(${CERES_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS})
+include_directories(${CERES_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 
 catkin_simple()
 
@@ -23,8 +23,8 @@ cs_add_library(calibration_nodelet
   src/camera_intrinsics.cpp
 )
 target_link_libraries(calibration_nodelet
-  ${CATKIN_LIBRARIES}
-  ${CERES_LIBRARIES})
+  ${CERES_LIBRARIES}
+  ${OpenCV_LIBRARIES})
 
 cs_add_library(calibration_test_nodelet
   src/calibration_test_nodelet.cpp
@@ -34,24 +34,24 @@ cs_add_library(calibration_test_nodelet
   src/get_init_pose.cpp
   src/camera_intrinsics.cpp)
 target_link_libraries(calibration_test_nodelet
-  ${CATKIN_LIBRARIES}
-  ${CERES_LIBRARIES})
+  ${CERES_LIBRARIES}
+  ${OpenCV_LIBRARIES})
 
 cs_add_executable(test_rectify_node
   src/test_rectify_node.cpp
   src/test_rectify.cpp)
 target_link_libraries(test_rectify_node
-  ${CATKIN_LIBRARIES})
+  ${OpenCV_LIBRARIES})
 
 cs_add_library(image_conversion_nodelet
   src/image_conversion_nodelet.cpp)
 target_link_libraries(image_conversion_nodelet
-  ${CATKIN_LIBRARIES})
+  ${OpenCV_LIBRARIES})
 
 cs_add_library(undistort_nodelet
   src/undistort_nodelet.cpp)
 target_link_libraries(undistort_nodelet
-  ${CATKIN_LIBRARIES})
+  ${OpenCV_LIBRARIES})
 
 cs_install()
 install(FILES nodelet_plugin.xml
