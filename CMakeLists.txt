@@ -7,7 +7,7 @@ add_compile_options(-Wall)
 
 find_package(catkin_simple REQUIRED)
 find_package(Ceres REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 3 REQUIRED)
 
 include_directories(${CERES_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 
