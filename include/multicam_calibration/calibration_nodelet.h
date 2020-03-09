@@ -21,6 +21,7 @@
 #include <rosbag/bag.h>
 #include <std_srvs/Trigger.h>
 #include <iostream>
+#include <memory>
 
 
 namespace multicam_calibration {
@@ -104,7 +105,7 @@ namespace multicam_calibration {
     bool record_bag_;
     bool bagIsOpen_{false};
     std::string bag_file_;
-    rosbag::Bag output_bag_;
+    std::shared_ptr<rosbag::Bag> output_bag_;
   };
 }
 #endif

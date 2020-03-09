@@ -72,11 +72,12 @@ namespace multicam_calibration {
     nh.param<bool>("record_bag", record_bag_, false);
     nh.param<std::string>("bag_base", bag_file_, std::string("~/.ros/multicam_calibration"));
     if (record_bag_) {
+      output_bag_.reset(new rosbag::Bag());
       std::string fname = make_filename(bag_file_, ".bag");
-      output_bag_.open(fname, rosbag::bagmode::Write);
+      output_bag_->open(fname, rosbag::bagmode::Write);
 #ifdef TEST_IF_OPEN
       // this does not build under kinetic, but under lunar?
-      bagIsOpen_ = output_bag_.isOpen();
+      bagIsOpen_ = output_bag_->isOpen();
       if (!bagIsOpen_) {
         ROS_ERROR_STREAM("cannot open bag file: " << fname);
       }
@@ -226,7 +227,7 @@ namespace multicam_calibration {
 
     // close the bag
     if (record_bag_ && bagIsOpen_) {
-      output_bag_.close();
+      output_bag_->close();
       bagIsOpen_ = false;
     }
     
@@ -732,7 +733,7 @@ namespace multicam_calibration {
     if (record_bag_ && bagIsOpen_) {
       for (size_t i = 0; i < cameras_.size(); ++i) {
         auto& img = msg_vec[i];
-        output_bag_.write(cameras_[i].rostopic, img->header.stamp, *img);
+        output_bag_->write(cameras_[i].rostopic, img->header.stamp, *img);
       }
     }
     
