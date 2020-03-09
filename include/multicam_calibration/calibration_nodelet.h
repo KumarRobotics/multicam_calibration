@@ -68,7 +68,6 @@ namespace multicam_calibration {
     void publishTagCounts();
     bool guessCameraPose(const CamWorldPoints &wp, const CamImagePoints &ip, CameraExtrinsics *cam0tf, int frameNum) const;
     void writeCalibration(std::ostream &os, const CalibDataVec &results);
-    void homographyTest(const CalibDataVec &results) const;
     void testCalibration(const CalibDataVec &calib);
     void updateCameras(const CalibDataVec &results);
     int  getCameraIndex(const std::string &cam) const;

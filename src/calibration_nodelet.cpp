@@ -218,8 +218,6 @@ namespace multicam_calibration {
     writeCalibration(std::cout, results);
     // test with poses from optimizer
     testCalibration(results);
-    // test with poses computed from homography
-    homographyTest(results);
     std::string cmd = "ln -sf " + fname + " " + calibDir + "/" + linkName;
     if (std::system(NULL) && std::system(cmd.c_str())) {
       ROS_ERROR_STREAM("link command failed: " << cmd);
@@ -323,93 +321,6 @@ namespace multicam_calibration {
     ROS_INFO_STREAM("max error: " <<  std::sqrt(maxErr.first)
                     << " px at frame: " << maxErr.second << " for cam: " << maxErrCam);
     
-  }
-
-  void CalibrationNodelet::homographyTest(const CalibDataVec &results) const {
-    if (worldPoints_.empty()) {
-      ROS_WARN("no world points to test calib!");
-      return;
-    }
-    
-    if (results.size() != imagePoints_.size() || results.size() != worldPoints_.size()) {
-      ROS_WARN("number of cameras does not match number of points!");
-      return;
-    }
-    struct CamErr {
-      double errSum {0};
-      int    cnt {0};
-    };
-    ROS_INFO_STREAM("-------------- simple homography test ---------");
-    // want at least 4 tags visible, or else the homography is not very stable
-    const unsigned int MIN_NUM_POINTS(4*4);
-    std::ofstream df("debug.txt");
-    std::vector<CamErr> cam_error(worldPoints_.size());
-    for (unsigned int frame = 0; frame < worldPoints_[0].size(); frame++) {
-      for (unsigned int cam_idx = 0; cam_idx < worldPoints_.size(); cam_idx++) {
-        const auto &wpts = worldPoints_[cam_idx][frame];
-        const auto &ipts = imagePoints_[cam_idx][frame];
-        const CameraIntrinsics &ci = results[cam_idx].intrinsics;
-        if (wpts.size() >= MIN_NUM_POINTS) { // found first camera that has observed points!
-          // get transform T_cnm1_world from homography.
-          CameraExtrinsics T_c1_world =
-            get_init_pose::get_init_pose(wpts, ipts, ci.intrinsics, ci.distortion_model, ci.distortion_coeffs);
-          CameraExtrinsics T_c2_c1 = identity();
-          for (unsigned int cam2_idx = cam_idx; cam2_idx < results.size(); cam2_idx++) {
-            CamErr &ce = cam_error[cam2_idx];
-            const CalibrationData &cam2 = results[cam2_idx];
-            T_c2_c1 = (cam2_idx == cam_idx) ? identity() : cam2.T_cn_cnm1 * T_c2_c1; // forward the chain
-            CameraExtrinsics T_c2_world = T_c2_c1 * T_c1_world;
-            const auto &wpts2 = worldPoints_[cam2_idx][frame];
-            const auto &ipts2 = imagePoints_[cam2_idx][frame];
-            if (wpts2.size() >= MIN_NUM_POINTS) {
-              // take the world points observed by the second camera,
-              // and transform them according to T_cam_world into cam2 frame.
-              // Then project them into cam2 and see how they line
-              // up with image points.
-              FrameImagePoints ipts2proj;
-              const CameraIntrinsics &ci2 = cam2.intrinsics;
-              get_init_pose::project_points(wpts2, T_c2_world, ci2.intrinsics,
-                                            ci2.distortion_model, ci2.distortion_coeffs,
-                                            &ipts2proj);
-              double e(0);
-              for (unsigned int i = 0; i < ipts2.size(); i++) {
-                double dx = (ipts2[i].x - ipts2proj[i].x);
-                double dy = (ipts2[i].y - ipts2proj[i].y);
-                e += dx*dx + dy*dy;
-              }
-              double epp = sqrt(e/(double)ipts2.size()); // per pixel error
-              ce.errSum += e;
-              ce.cnt    += ipts2.size();
-              if (epp > 10.0) {
-                ROS_WARN_STREAM("frame " << frame << " tested between cams " << cam_idx
-                                << " and " << cam2_idx << " has high pixel err: " << epp);
-                
-                df << frame << " " << cam2_idx << " " << wpts2.size();
-                for (const auto &wp2 : wpts2) {
-                  df << " " << wp2.x << " " << wp2.y << " " << wp2.z;
-                }
-                for (const auto &ip2 : ipts2) {
-                  df << " " << ip2.x << " " << ip2.y;
-                }
-                for (const auto &ip2 : ipts2proj) {
-                  df << " " << ip2.x << " " << ip2.y;
-                }
-                df << std::endl;
-              }
-            }
-          }
-          break;  // we are done
-        }
-      }
-    }
-    for (unsigned int cam_idx = 0; cam_idx < cam_error.size(); cam_idx++) {
-      const CamErr &ce = cam_error[cam_idx];
-      double perPointErr(0);
-      if (ce.cnt >= 0)  {
-        perPointErr = std::sqrt(ce.errSum / (double)ce.cnt);
-      }
-      ROS_INFO_STREAM("camera: " << cam_idx << " points: " << ce.cnt << " reproj err: " << perPointErr);
-    }
   }
 
   static std::string vec2str(const std::vector<double> v) {
