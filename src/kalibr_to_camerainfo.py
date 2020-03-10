@@ -18,7 +18,7 @@ def write_yaml(ydict, fname):
         except yaml.YAMLError as y:
             print("Error:", y)
 
-def kalibr_to_camerainfo(k):
+def kalibr_to_camerainfo(k, camera_name):
     y = {}
     intr = k['intrinsics']
     intrinsics = np.array([[intr[0], 0, intr[2]],[0, intr[1], intr[3]],[0,0,1]])
@@ -29,7 +29,7 @@ def kalibr_to_camerainfo(k):
     
     y['image_width']  = k['resolution'][0]
     y['image_height'] = k['resolution'][1]
-    y['camera_name']  = k['rostopic']
+    y['camera_name']  = k['rostopic'] if camera_name is None else camera_name
     y['camera_matrix'] = {'rows': 3,
                           'cols': 3,
                           'data': intrinsics.flatten().tolist()}
@@ -51,11 +51,12 @@ def main():
     parser.add_argument("-i", "--input", required=True, help="input file in Kalibr format")
     parser.add_argument("-o", "--output", required=True, help="output file in opencv/camerainfo format")
     parser.add_argument("-c", "--camera", default="cam0", help="name of camera to extract from Kalibr file")
+    parser.add_argument("-n", "--camera_name", default=None, help="name of camera in camerainfo file")
     args = parser.parse_args()
 
     print args.input
     kalibr_dict = read_yaml(args.input)
-    camerainfo_dict = kalibr_to_camerainfo(kalibr_dict[args.camera])
+    camerainfo_dict = kalibr_to_camerainfo(kalibr_dict[args.camera], args.camera_name)
     write_yaml(camerainfo_dict, args.output)
     
 if __name__=="__main__":
