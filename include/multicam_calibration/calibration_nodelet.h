@@ -71,6 +71,7 @@ namespace multicam_calibration {
     std::string testCalibration(const CalibDataVec &calib);
     void updateCameras(const CalibDataVec &results);
     int  getCameraIndex(const std::string &cam) const;
+    cv::Mat flipRotate(const cv::Mat &img, int camIdx) const;
 
     bool readPointsFromFile(const std::string &fname);
     // ---------- variables

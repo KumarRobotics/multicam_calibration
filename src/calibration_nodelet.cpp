@@ -163,6 +163,8 @@ namespace multicam_calibration {
       nh.param<bool>(cam + "/fix_intrinsics",  calibData.fixIntrinsics, false);
       nh.param<bool>(cam + "/fix_extrinsics",  calibData.fixExtrinsics, false);
       nh.param<bool>(cam + "/active",          calibData.active, true);
+      nh.param<int>(cam + "/flip_code",        calibData.flipCode, 2);
+      nh.param<int>(cam + "/rotate_code",      calibData.rotateCode, -1);
       if (cam_index == 0) {
         if (calibData.T_cn_cnm1 != identity()) {
           ROS_WARN_STREAM("Cam0 had a non-identity T_cn_cnm1 specified!");
@@ -678,8 +680,26 @@ namespace multicam_calibration {
     frameNum_++;
   }
 
-  void CalibrationNodelet::publishDebugImages(const std::vector<ImageMsg::ConstPtr> &msg_vec,
-                                              const std::vector<apriltag_ros::ApriltagVec> &detected_tags) {
+
+  cv::Mat CalibrationNodelet::flipRotate(
+    const cv::Mat &img, int camIdx) const {
+    // flip or rotate image if requested
+    const CalibrationData &cd = cameras_[camIdx];
+    const int rotateCode = cd.rotateCode;
+    cv::Mat rotFlipImg = img;
+    if (rotateCode != -1 && rotateCode <= 2) {
+      cv::rotate(img, rotFlipImg, rotateCode);
+    }
+    const int flipCode = cd.flipCode;
+    if (abs(flipCode) <= 1) {
+      cv::flip(rotFlipImg, rotFlipImg, flipCode);
+    }
+    return (rotFlipImg);
+  }
+
+  void CalibrationNodelet::publishDebugImages(
+    const std::vector<ImageMsg::ConstPtr> &msg_vec,
+    const std::vector<apriltag_ros::ApriltagVec> &detected_tags) {
     for (int i = 0; i < (int)detected_tags.size(); i++) {
       if (imagePub_[i].getNumSubscribers() > 0) {
         cv_bridge::CvImageConstPtr const cv_ptr = cv_bridge::toCvShare(
@@ -692,7 +712,9 @@ namespace multicam_calibration {
         cv::Mat img;
         cv::cvtColor(gray, img, CV_GRAY2BGR);
         apriltag_ros::DrawApriltags(img, detected_tags[i]);
-        cv_bridge::CvImage cv_img(msg_vec[i]->header, sensor_msgs::image_encodings::BGR8, img);
+        cv::Mat rotImg = flipRotate(img, i);
+        cv_bridge::CvImage cv_img(msg_vec[i]->header,
+                                  sensor_msgs::image_encodings::BGR8, rotImg);
         imagePub_[i].publish(cv_img.toImageMsg());
       }
     }

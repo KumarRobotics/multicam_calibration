@@ -26,6 +26,8 @@ namespace multicam_calibration {
     CameraExtrinsics  T_cn_cnm1;
     std::string       rostopic;
     int               tagCount{0};
+    int               rotateCode{-1};
+    int               flipCode{2};
     bool              fixIntrinsics{false};
     bool              fixExtrinsics{false};
     bool              active{true};

@@ -79,6 +79,8 @@ namespace multicam_calibration {
       nh.param<bool>(cam + "/fix_intrinsics",  calibData.fixIntrinsics, false);
       nh.param<bool>(cam + "/fix_extrinsics",  calibData.fixExtrinsics, false);
       nh.param<bool>(cam + "/active",          calibData.active, true);
+      nh.param<int>(cam + "/flip_code",        calibData.flipCode, 2);
+      nh.param<int>(cam + "/rotate_code",      calibData.rotateCode, -1);
       cdv.push_back(calibData);
     }
     return (cdv);
