@@ -228,6 +228,8 @@ namespace multicam_calibration {
       output_bag_->close();
       bagIsOpen_ = false;
     }
+    res.success = true;
+    res.message = "calibration ran";
     
     return (true);
   }

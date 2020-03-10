@@ -1,13 +1,17 @@
 <launch>
   <arg name="cam" default="/sync/cam0"/>
   <arg name="name" default="undistort"/>
+  <arg name="ignore_wrong_distortion" default="false"/>
+  <arg name="balance" default="0.0"/>
+  <arg name="fov_scale" default="2.0"/>
   <node pkg="nodelet" type="nodelet"
     name="$(arg name)" args="standalone multicam_calibration/UndistortNodelet"
     clear_params="true" output="screen">
     <remap from="~image" to="$(arg cam)/image_raw"/>
     <remap from="~camera_info_raw" to="$(arg cam)/camera_info"/>
     <!-- for balance and fov_scale see opencv fisheye documentation -->
-    <param name="balance" value="0.0"/>
-    <param name="fov_scale" value="2.0"/>
+    <param name="balance" value="$(arg balance)"/>
+    <param name="fov_scale" value="$(arg fov_scale)"/>
+    <param name="ignore_wrong_distortion" value="$(arg ignore_wrong_distortion)"/>
   </node>
 </launch>

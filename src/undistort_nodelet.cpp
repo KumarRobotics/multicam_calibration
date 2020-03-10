@@ -16,6 +16,7 @@ namespace multicam_calibration {
     imagePub_ = it.advertise("undist_image", 1);
     nh.param<double>("fov_scale", fovScale_, 1.0);
     nh.param<double>("balance", balance_, 0.0);
+    nh.param<bool>("ignore_wrong_distortion", ignoreWrongDistortion_, false);
   }
 
   void UndistortNodelet::imageCallback(const ImageConstPtr &img) {
@@ -44,7 +45,7 @@ namespace multicam_calibration {
 
   void UndistortNodelet::cameraInfoCallback(const CameraInfoConstPtr &camInfo) {
     if (camInfo->distortion_model != "equidistant" &&
-        camInfo->distortion_model != "fisheye") {
+        camInfo->distortion_model != "fisheye" && !ignoreWrongDistortion_) {
       ROS_ERROR_STREAM("invalid distortion model in camera_info: "
                        << camInfo->distortion_model);
       cameraInfoSub_.shutdown();

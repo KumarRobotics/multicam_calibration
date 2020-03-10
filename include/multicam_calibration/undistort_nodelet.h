@@ -32,6 +32,7 @@ namespace multicam_calibration {
     image_transport::Publisher  imagePub_;
     double                      fovScale_{1.0};
     double                      balance_{0.0};
+    bool                        ignoreWrongDistortion_{false};
     cv::Mat mapx_;
     cv::Mat mapy_;
   };
