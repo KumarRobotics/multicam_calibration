@@ -11,7 +11,8 @@
 namespace multicam_calibration {
   namespace {
     template <typename T>
-    inline T get_param(ros::NodeHandle const &n, std::string const &param_name) {
+    inline T get_param(ros::NodeHandle const &n,
+                       std::string const &param_name) {
       T param_value;
       if(!n.getParam(param_name, param_value))
         throw std::logic_error(param_name + " param not set!");
@@ -19,7 +20,8 @@ namespace multicam_calibration {
     }
   }
 
-  MultiCamApriltagDetector::MultiCamApriltagDetector(ros::NodeHandle &nh, const std::string& filename)  {
+  MultiCamApriltagDetector::MultiCamApriltagDetector(
+    ros::NodeHandle &nh, const std::string& filename)  {
     auto const target_type = get_param<std::string>(nh, "target_type");
     if(target_type != "aprilgrid")
       throw std::invalid_argument("target_type != aprilgrid");
@@ -29,6 +31,12 @@ namespace multicam_calibration {
     target_tag_rows_ = get_param<int>(nh, "tagRows");
     target_tag_size_ = get_param<float>(nh, "tagSize");
     target_tag_spacing_ratio_ = get_param<float>(nh, "tagSpacing");
+    std::string tf = "36h11"; // tag family
+    try {
+      tf = get_param<std::string>(nh, "tagFamily");
+    } catch (const std::logic_error &e) {
+      // not found, use default
+    }
 
     std::string outfname = filename;
     outfile_.open(outfname, std::ofstream::out);
@@ -37,9 +45,19 @@ namespace multicam_calibration {
     } else {
       ROS_INFO_STREAM("writing extracted corners to file " << outfname);
     }
-
+    if (tf != "36h11" && tf != "25h9"  && tf != "16h5") {
+      ROS_ERROR_STREAM("invalid tag family: " << tf);
+      throw std::invalid_argument("invalid tag family!");
+    }
+    apriltag_ros::TagFamily tagFamily = apriltag_ros::TagFamily::tf36h11;
+    if (tf == "25h9") {
+      tagFamily = apriltag_ros::TagFamily::tf25h9;
+    } else if (tf == "16h5") {
+      tagFamily = apriltag_ros::TagFamily::tf16h5;
+    }
+    
     detector_ = apriltag_ros::ApriltagDetector::Create(
-      apriltag_ros::DetectorType::Mit, apriltag_ros::TagFamily::tf36h11);
+      apriltag_ros::DetectorType::Mit, tagFamily);
     detector_->set_black_border(2);
   }
 

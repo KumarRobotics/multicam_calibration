@@ -217,7 +217,7 @@ namespace multicam_calibration {
     writeCalibration(of, results);
     writeCalibration(std::cout, results);
     // test with poses from optimizer
-    testCalibration(results);
+    std::string calibErr = testCalibration(results);
     std::string cmd = "ln -sf " + fname + " " + calibDir + "/" + linkName;
     if (std::system(NULL) && std::system(cmd.c_str())) {
       ROS_ERROR_STREAM("link command failed: " << cmd);
@@ -229,7 +229,7 @@ namespace multicam_calibration {
       bagIsOpen_ = false;
     }
     res.success = true;
-    res.message = "calibration ran";
+    res.message = calibErr;
     
     return (true);
   }
@@ -273,12 +273,13 @@ namespace multicam_calibration {
   static double avg(const Stat &s) {
     return (s.second > 0 ? s.first/s.second : 0.0);
   }
-  void CalibrationNodelet::testCalibration(const CalibDataVec &calib) {
+
+  std::string CalibrationNodelet::testCalibration(const CalibDataVec &calib) {
     Calibrator::Residuals res;
     calibrator_->testCalibration(&res);
     if (res.size() == 0) {
       ROS_ERROR("no residuals found for test!");
-      return;
+      return (std::string("calibration failed: no data found!"));
     }
     Stat totErr;
     Stat maxErr;
@@ -316,13 +317,16 @@ namespace multicam_calibration {
     }
     ROS_INFO_STREAM("----------------- reprojection errors: ---------------");
     ROS_INFO_STREAM(  "total error:     " << std::sqrt(avg(totErr)) << " px");
+    std::stringstream ss;
+    ss << "calib proj err: ";
     for (const auto cam_idx: irange(0ul, cameraStats.size())) {
-      ROS_INFO_STREAM("avg error cam " << cam_idx << ": " <<
-                      std::sqrt(avg(cameraStats[cam_idx])) << " px");
+      const double pxErr = std::sqrt(avg(cameraStats[cam_idx]));
+      ROS_INFO_STREAM("avg error cam " << cam_idx << ": " << pxErr << " px");
+      ss << "cam" << cam_idx << ": " << pxErr << "px ";
     }
     ROS_INFO_STREAM("max error: " <<  std::sqrt(maxErr.first)
                     << " px at frame: " << maxErr.second << " for cam: " << maxErrCam);
-    
+    return (ss.str());
   }
 
   static std::string vec2str(const std::vector<double> v) {
