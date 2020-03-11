@@ -34,9 +34,10 @@ def kalibr_to_camerainfo(k, camera_name):
                           'cols': 3,
                           'data': intrinsics.flatten().tolist()}
     y['distortion_model'] = distortion_model
+    dc = k['distortion_coeffs']
     y['distortion_coefficients'] = {'rows': 1,
-                                    'cols': 4,
-                                    'data': k['distortion_coeffs']}
+                                    'cols': len(dc),
+                                    'data': dc}
     y['rectification_matrix'] = {'rows': 3,
                                  'cols': 3,
                                  'data': np.eye(3).flatten().tolist()}
