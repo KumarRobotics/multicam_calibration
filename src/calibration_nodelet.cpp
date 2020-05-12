@@ -262,6 +262,10 @@ namespace multicam_calibration {
       cameras_[cam_idx].active = req.value;
       res.message = "set active successful";
       break;
+    case 3: // exit calibration
+      res.message = "exiting";
+      ros::shutdown();
+      break;
     default:
       ROS_ERROR_STREAM("invalid parameter: " << (int) req.param);
       res.success = false;
