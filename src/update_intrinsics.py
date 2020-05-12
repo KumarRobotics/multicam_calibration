@@ -3,7 +3,7 @@
 # 2020 Bernd Pfrommer
 #
 
-#
+# little script to grab the intrinsics from camera_info
 #
 #
 
@@ -15,8 +15,12 @@ import rospy
 import re
 import threading
 import copy
+import sys
 
 from sensor_msgs.msg import CameraInfo
+import std_srvs.srv
+
+args = None
 
 def read_yaml(filename):
     with open(filename, 'r') as y:
@@ -32,6 +36,7 @@ def write_yaml(ydict, fname):
         except yaml.YAMLError as y:
             print("Error:", y)
 
+
 def make_topic(name, c):
     if 'rostopic_camerainfo' in c:
         return c['rostopic_camerainfo']
@@ -39,7 +44,12 @@ def make_topic(name, c):
         print('ERROR: no rostopic found for camera: ', name)
         raise Excepton('ERROR: no rostopic found for camera: ' + name)
     tp = c['rostopic']
-    return re.sub(r'(?is)/image_raw.+', '/camera_info', tp)
+    if '/image_raw' in tp:
+        return re.sub(r'/image_raw', '/camera_info', tp)
+    elif '/image_rect_raw' in tp:
+        return re.sub(r'/image_rect_raw', '/camera_info', tp)
+    else:
+        raise Exception('ERROR: cannot guess camerainfo topic for ' + tp)
 
 
 class CameraInfoWaiter():
@@ -50,7 +60,7 @@ class CameraInfoWaiter():
         self.msg = None
     
     def callback(self, msg):
-        rospy.loginfo('got caminfo msg on topic ' + self.topic)
+        #rospy.loginfo('got caminfo msg on topic ' + self.topic)
         #print(str(msg))
         self.msg = msg
         self.subscriber.unregister()
@@ -60,8 +70,8 @@ class CameraInfoWaiter():
         self.subscriber = rospy.Subscriber(self.topic, CameraInfo,
                                            self.callback)
         self.event = threading.Event()
-        rospy.loginfo('waiting for max %fs for camerainfo event' %
-                      self.max_time)
+        rospy.loginfo('%s waiting for %.2fs for topic %s' %
+                      (self.name, self.max_time, self.topic))
         self.event.wait(self.max_time)
         self.subscriber.unregister()
         return self.msg  # will return none if nothing comes in
@@ -85,31 +95,52 @@ def adjustIntrinsics(c, ci):
         print('ERROR: invalid dist model: ', dist_model)
         raise Exception('ERROR: invalid dist model: ' + dist_model)
     return c
-    
-def main():
-    parser = argparse.ArgumentParser(description='Subscribe to camerainfo messages to adjust camera intrinsics')
-    parser.add_argument("-t", "--template", required=True, help="template input file in Kalibr format")
-    parser.add_argument("-o", "--output", required=True, help="output file with adjusted intrinsics")
-    args = parser.parse_args()
-    
-    rospy.init_node('caminfo_waiter')
 
+def do_intrinsics_update():
+    global args
     cinfo = read_yaml(args.template)
     cinfo_adj = {}
+    status = True
     for cam in sorted(cinfo.keys()):
         c = cinfo[cam]
-        print('camera: ', cam)
         topic = make_topic(cam, c)
-        print('checking topic: ', topic)
         caminfoWaiter = CameraInfoWaiter(cam, topic, 3.0)
         ci = caminfoWaiter.get_camerainfo()
         if ci is not None:
             cinfo_adj[cam] = adjustIntrinsics(copy.deepcopy(c), ci)
         else:
-            print("WARNING WARNING WARNING: intrinsics not adjusted!!!")
+            rospy.logerr("intrinsics not adjusted!!!")
             cinfo_adj[cam] = copy.deepcopy(c)
-
+            status = False
+    print("writing file to: ", args.output)
     write_yaml(cinfo_adj, args.output)
+    return status
+    
+def service_callback(req):
+    print("--------- updating intrinsics --------")
+    status = do_intrinsics_update()
+    return status, "intrinsics " + ("updated" if status else "NOT updated")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Subscribe to camerainfo messages to adjust camera intrinsics')
+    global args
+    args = parser.parse_args(rospy.myargv()[1:])
+
+    rospy.init_node('caminfo_waiter')
+    args.template = rospy.get_param('~template')
+    args.output = rospy.get_param('~output')
+    args.offer_service = rospy.get_param('~offer_service')
+    
+    if args.offer_service:
+        s = rospy.Service('update_intrinsics', std_srvs.srv.Trigger, service_callback)
+        rospy.spin()
+    else:
+        return do_intrinsics_update()
 
 if __name__=="__main__":
-    main()    
+    status = main()
+    if status:
+        sys.exit(0)
+    else:
+        sys.exit(1)
