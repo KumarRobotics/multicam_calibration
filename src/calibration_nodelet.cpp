@@ -72,6 +72,8 @@ namespace multicam_calibration {
     nh.param<bool>("record_bag", record_bag_, false);
     nh.param<std::string>("bag_base", bag_file_, std::string("~/.ros/multicam_calibration"));
     if (record_bag_) {
+      ROS_WARN("sorry, due to a bug in ROS, bag writing is disabled!");
+#if 0      
       output_bag_.reset(new rosbag::Bag());
       std::string fname = make_filename(bag_file_, ".bag");
       output_bag_->open(fname, rosbag::bagmode::Write);
@@ -84,6 +86,7 @@ namespace multicam_calibration {
 #else
       bagIsOpen_ = true;
 #endif
+#endif      
     }
     
     image_transport::ImageTransport it(nh);
@@ -386,7 +389,7 @@ namespace multicam_calibration {
     if (distm == "equidistant") {
       cv::fisheye::stereoRectify(K1, ci1.distortion_coeffs, K2, ci2.distortion_coeffs,
                                  cv::Size(ci1.resolution[0], ci2.resolution[1]),
-                                 rvec, tvec, *R1, *R2, *P1, *P2, *Q, CV_CALIB_ZERO_DISPARITY);
+                                 rvec, tvec, *R1, *R2, *P1, *P2, *Q, cv::CALIB_ZERO_DISPARITY);
     } else if (distm == "radtan" || distm == "plumb_bob") {
       // XXX never tested!
       cv::stereoRectify(K1, ci1.distortion_coeffs, K2, ci2.distortion_coeffs,

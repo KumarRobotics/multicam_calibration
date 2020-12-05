@@ -13,7 +13,7 @@ Download the package:
 You will need the following packages in your ROS workspace:
 
 	git clone https://github.com/catkin/catkin_simple
-	git clone https://github.com/versatran01/apriltag.git
+	git clone --recursive https://github.com/versatran01/apriltag.git
 
 
 And probably libceres:
