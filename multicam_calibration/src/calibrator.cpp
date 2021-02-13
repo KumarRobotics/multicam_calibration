@@ -210,10 +210,9 @@ namespace multicam_calibration {
 #endif
 
   void Calibrator::showCameraStatus() const {
-    for (const auto &cam: calibrationData_) {
-      ROS_INFO("%-10s: fix intr: %d, fix extr: %d, active: %d",
-               cam.name.c_str(), cam.fixIntrinsics,
-               cam.fixExtrinsics, cam.active);
+    for (const auto &cam : calibrationData_) {
+      printf("%-10s: fix intr: %d, fix extr: %d, active: %d", cam.name.c_str(),
+             cam.fixIntrinsics, cam.fixExtrinsics, cam.active);
     }
   }
 
@@ -277,10 +276,10 @@ namespace multicam_calibration {
 
   void Calibrator::runCalibration() {
     if (calibrationData_.empty() || worldPoints_.empty()) {
-      ROS_ERROR("no data to run on!");
+      std::cerr << "no data to run on!" << std::endl;
       return;
     }
-    ROS_INFO_STREAM("camera status at start:");
+    std::cout << "camera status at start:" << std::endl;
     showCameraStatus();
 
     params_.clear();

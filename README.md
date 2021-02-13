@@ -1,37 +1,44 @@
 # multicam_calibration - extrinsic and intrinsic calbration of cameras
 
+This repo contains a ROS2 package for intrinsic and extrinsic
+calibration of multi-camera systems using a grid of apriltags (checkerboard is not supported).
+
+Supports fisheye (``equidistant``) and standard ``radtan`` distortion models.
+
+Tested on Ubuntu 20.04 with ROS2 Foxy.
+
 ## Installation
+You will need libceres:
+```
+	sudo apt install libceres-dev
+```
 
 Download the package:
-	
-	mkdir catkin_ws
-	cd catkin_ws
-	mkdir src
-	cd src
-	git clone https://github.com/KumarRobotics/multicam_calibration.git
-
-You will need the following packages in your ROS workspace:
-
-	git clone https://github.com/catkin/catkin_simple
-	git clone --recursive https://github.com/versatran01/apriltag.git
-
-
-And probably libceres:
-
-	sudo apt install libceres-dev
-
-
-What else you are missing you'll find out now:
-
-	cd catkin_ws
-	catkin config -DCMAKE_BUILD_TYPE=Release
-	catkin build
-
+```	
+mkdir -p my_ros_ws/src
+cd my_ros_ws/src
+git clone --branch ros2	https://github.com/KumarRobotics/multicam_calibration.git
+```
+You will also need the [ROS2 version of the apriltag ROS2 wrapper](https://github.com/versatran01/apriltag/tree/ros2). Follow the above link for instructions, but it should be something like:
+```
+git clone --branch ros2 https://github.com/berndpfrommer/apriltag.git
+cd ..
+wstool init src src/apriltag/apriltag_umich/apriltag_umich.rosinstall 
+```
+Build (after sourcing your ROS2 environment):
+```
+cd my_rows_ws
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+```
+Overlay workspace:
+```
+source install/setup.bash
+```
 ## How to use:
 
-First, produce the best starting guess you can come up with,
-and edit it into ``calib/example/example_camera-initial.yaml``:
-
+First produce the best starting guess you can come up with,
+and edit it. There is an example in ``calib/example/example_camera-initial.yaml``. 
+```
 	cam0:
 	  camera_model: pinhole
 	  intrinsics: [605.054, 604.66, 641.791, 508.728]
@@ -51,47 +58,65 @@ and edit it into ``calib/example/example_camera-initial.yaml``:
 	  distortion_coeffs: [-0.0146155, -0.00291494, -0.000681981, 0.000221855]
 	  resolution: [1280, 1024]
 	  rostopic: /rig/right/image_mono
+```
 
-Adjust the topics to match your camera sources.
+Adjust the ``rostopic`` to match your camera sources, match the resolution, distortion model etc.
+The file format is identical to the [Kalibr file format](https://github.com/ethz-asl/kalibr).
+Put it the edited file into a directory called e.g. ``stereo_cam`` or whatever the name of your device is.
 
-You must use an aprilgrid target for calibration, layout follows Kalibr conventions and 
-is specified in ``config/aprilgrid.yaml``.
+Edit the launch file ``calibration.launch.py`` in the ``launch`` directory to your liking:
+```python
+parameters=[{'calib_dir': calib_dir,
+             'target_type': 'aprilgrid',
+             'tag_rows': 5,
+             'tag_cols': 7,
+             'tag_size': 0.04,
+             'tag_spacing': 0.25,
+             'black_border': 2,
+             'tag_family': '36h11',
+             'corners_in_file': '',
+             'use_approximate_sync': False,
+             'device_name': device_name}],
+```
+Adjust device_name to match the file name of your initial calibration file, e.g. ``stereo_cam``.
+Match the rows, columns and tag size of your aprilgrid.
+Pay attention to the size of the black border, and set ``use_approximate_sync`` to true if your
+camera does not produce synchronized images (synced means: message time stamps must be identical across cameras).
+Once done editing, install the launch file run above colcon command again), and launch it. 
+```bash
+ros2 launch multicam_calibration calibration.launch.py
+```
+You should see some output like this:
+```
+[calibration_node-1] parsing initial camera calibration file: /mypath/calib/stereo_cam/stereo_cam-initial.yaml
+[calibration_node-1] [INFO] [1613243221.909816377] [multicam_calibration]: Found 2 cameras!
+[calibration_node-1] [INFO] [1613243221.909937970] [multicam_calibration]: not using approximate sync
+[calibration_node-1] [INFO] [1613243221.910176548] [multicam_calibration]: writing extracted corners to file /mypath/calib/stereo_cam/corners.csv
+[calibration_node-1] [INFO] [1613243221.924387353] [multicam_calibration]: calibration_node started up!
+[calibration_node-1] [INFO] [1613243225.043543976] [multicam_calibration]: frames:   10, total # tags found:  115 67
+[calibration_node-1] [INFO] [1613243228.906891399] [multicam_calibration]: frames:   20, total # tags found:  233 131
+[calibration_node-1] [INFO] [1613243257.529047985] [multicam_calibration]: frames:   30, total # tags found:  350 198
+[calibration_node-1] [INFO] [1613243260.514001182] [multicam_calibration]: frames:   40, total # tags found:  467 266
 
-Then launch the camera calibration:
-
-	roslaunch multicam_calibration calibration.launch
-	
-You can see the camera images and the detected tags overlaid with any of the ros
-image visualization tools.
+```
+Visualize the camera debug images:
+```bash
+ros2 run rqt_gui rqt_gui
+```
+Look for the ``debug_image`` topics. You should see something like this:
 ![Example Calibration Session](images/example_gui.jpg)
-There is a sample perspective file in the config directory:
 
-	rqt --perspective-file=config/example.perspective
-
-Then play your calibration bag (or do live calibration):
+Then play your calibration bag (or do live calibration)
 
 	rosbag play falcam_rig_2018-01-09-14-28-56.bag
 
-You should see the tags detected, and output like this on the terminal:
+You should see the tags detected (see above output). When you think you have
+enough frames collected (5000 tags is usually plenty enough), you can start the calibration:
 
-	type is multicam_calibration/CalibrationNodelet
-	[ INFO] [1515674455.127216052]: added camera: cam0
-	[ INFO] [1515674455.130332740]: added camera: cam1
-	[ INFO] [1515674455.131238617]: not using approximate sync
-	[ INFO] [1515674455.132790610]: writing extracted corners to file corners.csv
-	[ INFO] [1515674458.646217104]: frame number:   10, total number of tags found:  349 336
-	[ INFO] [1515674459.958243084]: frame number:   20, total number of tags found:  698 686
-	[ INFO] [1515674461.349852261]: frame number:   30, total number of tags found:  1048 1036
-	... more lines here ....
-	[ WARN] [1515674512.667679323]: no detections found, skipping frame!
-	[ INFO] [1515674512.757430315]: frame number:  410, total number of tags found:  11896 13300
-
-When you think you have enough frames collected, you can start the calibration:
-
-	rosservice call /multicam_calibration/calibration
+	ros2 service call /calibration std_srvs/srv/Trigger
 	
 This should give you output like this:
-
+```
 	Num params: 2476
 	Num residuals: 201928
 	iter      cost      cost_change  |gradient|   |step|    tr_ratio  tr_radius  ls_iter  iter_time  total_time
@@ -172,13 +197,15 @@ This should give you output like this:
 	[ INFO] [1515674589.251410620]: -------------- simple homography test ---------
 	[ INFO] [1515674589.331235450]: camera: 0 points: 47700 reproj err: 0.440283
 	[ INFO] [1515674589.331257726]: camera: 1 points: 53252 reproj err: 0.761365
+```
 
-In the ``calib/example`` directory you can now find the output of the calibration:
+In the calibration directory you can now find the output of the calibration:
 
 	ls -1
-	example_camera-2018-01-11-08-24-22.yaml
-	example_camera-initial.yaml
-	example_camera-latest.yaml
+	stereo_camera-2018-01-11-08-24-22.yaml
+	stereo_camera-initial.yaml
+	stereo_camera-latest.yaml
+
 
 ## Managed calibrations
 
@@ -220,7 +247,17 @@ section, adjust as needed:
         set_p(SET_ACTIVE,     "cam1", True)
         run_cal()
 
+## Undistortion
+
+For convenience this repo contains a node to undistort fisheye (equidistant) camera images.
+Run it like this, after adjusting the parameters in the launch file:
+```
+ros2 launch multicam_calibration undistort.launch.py
+```
+
 ## Unit tests
 
-For unit testing of the calibration code, refer to [this page](test/README.md).
+For unit testing of the calibration code, refer to [this page](multicam_calibratin/test/README.md).
+NOTE: the tests have been ported but never run under ROS2. Expect things to be broken.
+
 
