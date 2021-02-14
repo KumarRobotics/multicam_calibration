@@ -3,10 +3,14 @@
   <name>multicam_calibration</name>
   <version>1.0.0</version>
   <description>ROS2 package for camera calibration</description>
+  <author>Bernd Pfrommer and Kartik Mohta</author>
   <maintainer email="bernd.pfrommer@gmail.com">Bernd Pfrommer</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
 
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>

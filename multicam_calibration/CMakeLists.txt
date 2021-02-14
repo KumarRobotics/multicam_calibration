@@ -6,6 +6,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(-Wall)
 
+#
+# for c++
+#
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -31,6 +34,10 @@ set(common_ament_dependencies
 foreach(pkg ${common_ament_dependencies})
   find_package(${pkg} REQUIRED)
 endforeach()
+#
+# for python
+#
+find_package(rclpy REQUIRED)
 
 
 #
@@ -102,6 +109,11 @@ install(TARGETS
   EXPORT export_${PROJECT_NAME}
   DESTINATION lib
   INCLUDES include)
+
+# Install python scripts
+install(PROGRAMS
+  scripts/example_calib_manager.py
+  DESTINATION lib/${PROJECT_NAME}/)
 
 install(TARGETS
   calibration_node

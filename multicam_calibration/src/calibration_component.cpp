@@ -209,6 +209,8 @@ bool CalibrationComponent::setParameter(
         res) {
   int cam_idx = getCameraIndex(req->camera);
   res->success = true;
+  RCLCPP_INFO_STREAM(get_logger(),
+                     "set param " << req->param << " to " << req->value);
   switch (req->param) {
     case 0:  // fix intrinsics
       cameras_[cam_idx].fixIntrinsics = req->value;

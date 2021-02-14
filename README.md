@@ -247,6 +247,14 @@ section, adjust as needed:
         set_p(SET_ACTIVE,     "cam1", True)
         run_cal()
 
+To run the calibration manager, do this:
+```bash
+ros2 run multicam_calibration example_calib_manager.py -n multicam_calibration
+```
+To trigger its execution:
+```bash
+ros2 service call /run_calibration_manager std_srvs/srv/Trigger
+```
 ## Undistortion
 
 For convenience this repo contains a node to undistort fisheye (equidistant) camera images.
