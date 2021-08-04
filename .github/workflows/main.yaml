@@ -1,0 +1,43 @@
+name: build repo
+
+on:
+ push:
+    branches:
+      - master
+jobs:
+  build_xenial:
+    runs-on: ubuntu-16.04
+    container:
+      image: berndpfrommer/xenial_ros:1
+    name: build repo from source on xenial
+    steps:
+      - name: check out github repo
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 0
+      - name: compile from source
+        run: git checkout master && ./.github/scripts/build.bash
+  build_bionic:
+    runs-on: ubuntu-18.04
+    container:
+      image: berndpfrommer/bionic_ros:1
+    name: build repo from source on bionic
+    steps:
+      - name: check out github repo
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 0
+      - name: compile from source
+        run: git checkout master && ./.github/scripts/build.bash
+  build_focal:
+    runs-on: ubuntu-20.04
+    container:
+      image: berndpfrommer/focal_ros:1
+    name: build repo from source on focal
+    steps:
+      - name: check out github repo
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 0
+      - name: compile from source
+        run: git checkout master && ./.github/scripts/build.bash
