@@ -17,6 +17,20 @@ namespace multicam_calibration {
               0,       0,       1.0);
     }
 
+    cv::Mat tf_to_R(const Eigen::Matrix<double, 4,4> &te) {
+      cv::Mat R = (cv::Mat_<double>(3,3) <<
+                   te(0,0), te(0,1), te(0,2),
+                   te(1,0), te(1,1), te(1,2),
+                   te(2,0), te(2,1), te(2,2));
+      return (R);
+    }
+ 
+    cv::Mat tf_to_T(const Eigen::Matrix<double, 4,4> &te) {
+      cv::Mat T = (cv::Mat_<double>(3,1) <<
+                   te(0,3), te(1,3), te(2,3), te(2,1));
+      return (T);
+    }
+ 
     void tf_to_rvec_tvec(const Eigen::Matrix<double, 4,4> &te,
                          cv::Affine3f::Vec3 *rvec, cv::Affine3f::Vec3 *tvec) {
       cv::Affine3d::Mat4 T_mat = {te(0,0), te(0,1), te(0,2), te(0,3),
