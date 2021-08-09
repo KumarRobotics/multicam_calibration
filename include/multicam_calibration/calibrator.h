@@ -28,14 +28,21 @@ namespace multicam_calibration {
     CalibDataVec getCalibrationResults() const;
     // returns residuals[frame_num][cam_idx][point_idx]
     void testCalibration(Residuals *resptr);
+    // removes outliers with reprojection error more than maxErr pixels
+    void removeOutliers(double maxErr);
 
   private:
     void initializeVariables(std::vector<double> *param_ptr);
     void setupOptimizationProblem(ceres::Problem *prob, std::vector<double> *vars);
-    
+    size_t getPointsAndMasks(size_t fnum,
+                             std::vector<FrameWorldPoints> *frame_world_points,
+                             std::vector<FrameImagePoints> *frame_image_points,
+                             std::vector<std::vector<bool>> *masks) const;
+
     CalibDataVec                  calibrationData_;
     std::vector<CamWorldPoints>   worldPoints_;
     std::vector<CamImagePoints>   imagePoints_;
+    std::vector<std::vector<std::vector<bool>>> masks_;
     CameraExtrinsicsVec           cam0PoseGuess_; // initial pose guess cam0, one per frame
     std::vector<double>           params_; // all the parameters that need to be optimized
     bool                          fixAllIntrinsics_{false};

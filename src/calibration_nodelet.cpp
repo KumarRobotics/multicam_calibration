@@ -195,9 +195,16 @@ namespace multicam_calibration {
 
   bool CalibrationNodelet::calibrate(std_srvs::Trigger::Request& req,
                                      std_srvs::Trigger::Response &res) {
+    ros::NodeHandle nh = getPrivateNodeHandle();
     calibrator_->setCameras(cameras_);
     calibrator_->showCameraStatus();
     calibrator_->runCalibration();
+    const double outlierThresh = nh.param<double>("outlier_pixel_threshold", -1.0);
+    if (outlierThresh > 0) {
+      calibrator_->removeOutliers(outlierThresh);
+      ROS_INFO_STREAM("removed outliers, rerunning calibration!");
+      calibrator_->runCalibration();
+    }
     CalibDataVec results = calibrator_->getCalibrationResults();
     if (results.empty()) {
       ROS_ERROR("empty calibration results, no file written!");
@@ -206,7 +213,6 @@ namespace multicam_calibration {
       return (true);
     }
     std::string baseName, linkName, calibDir, resultsDir;
-    ros::NodeHandle nh = getPrivateNodeHandle();
     nh.param<std::string>("output_filename", baseName, "calibration_output");
     nh.param<std::string>("latest_link_name", linkName, "latest.yaml");
     nh.param<std::string>("calib_dir", calibDir, "calib");

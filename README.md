@@ -180,6 +180,37 @@ In the ``calib/example`` directory you can now find the output of the calibratio
 	example_camera-initial.yaml
 	example_camera-latest.yaml
 
+## Parameters
+
+- ``use_approximate_sync``: (default: false) uses the ROS approximate sync framework to
+  approximately synchronize image frames with different message header
+  stamps.
+- ``corners_file``: if a corners file is specified, such corners file is
+  loaded as input data when the calibration node starts up, as if
+  these corners had been detected by 
+  feeding images to the calibration node. This allows repeating of
+  previously done calibrations by keeping the corners file instead of
+  all the images. Whenever points are fed into the calibration node,
+  it writes the corners to ``~/.ros/corners.csv``.
+- ``run_calib_no_init``: run calibration right after loading the
+  corners file. This is mostly for debugging purposes.
+- ``fix_intrinsics``: fixes all intrinsics. Note that more
+  fine-grained fixing of intrinsics for individual cameras can be done
+  on the fly with ROS service calls.
+- ``record_bag``: was supposed to record the images that were used for
+  calibration, but this feature is currently broken due to some ROS
+  bug.
+- ``outlier_pixel_threshold`` (default: -1). If specified greater than
+  0 will remove any detected corners that exceed the error threshold
+  and re-run the calibration again. Note: new option, has not seen
+  much testing yet.
+- ``output_filename``, ``latest_link_name``, ``calib_dir``, and
+  ``results_dir`` combined specify where to look for the initial files
+  and where the calibration results will go. The parameterization is
+  somewhat confusing so it's best to look at the example launch files
+  and/or the source code.
+
+
 ## Managed calibrations
 
 Sometimes a calibration consists of a sequence of steps, for example: first the

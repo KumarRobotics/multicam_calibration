@@ -9,6 +9,7 @@
 #include <boost/range/irange.hpp>
 #include <fstream>
 #include <iomanip>
+#include <algorithm>
 
 #define CERES_PUBLIC_INTERNAL_CONFIG_H_
 #include <ceres/ceres.h>
@@ -76,9 +77,10 @@ namespace multicam_calibration {
     // each of the cameras
     FrameResidual(const std::vector<FrameWorldPoints> &world_points,
                   const std::vector<FrameImagePoints> &image_points,
+                  const std::vector<std::vector<bool>> &masks,
                   const CalibDataVec &cams) :
-      world_points_(world_points), image_points_(image_points), cams_(cams)
-      {
+      world_points_(world_points), image_points_(image_points), masks_(masks),
+      cams_(cams) {
       }
 
     template <typename T>
@@ -131,10 +133,12 @@ namespace multicam_calibration {
                 return (false);
               }
               for(const auto i : irange<size_t>(0, projected_points.size())) {
-                residual[residual_count++] =
-                  projected_points[i].x - T(image_points_[cam_idx][i].x);
-                residual[residual_count++] =
-                  projected_points[i].y - T(image_points_[cam_idx][i].y);
+                if (masks_[cam_idx][i]) {
+                  residual[residual_count++] =
+                    projected_points[i].x - T(image_points_[cam_idx][i].x);
+                  residual[residual_count++] =
+                    projected_points[i].y - T(image_points_[cam_idx][i].y);
+                }
               }
             }
             intrinsics_offset += cam.intrinsics.intrinsics.size() +
@@ -146,6 +150,7 @@ namespace multicam_calibration {
   private:
     const std::vector<FrameWorldPoints> world_points_;
     const std::vector<FrameImagePoints> image_points_;
+    const std::vector<std::vector<bool>> masks_;
     CalibDataVec cams_;
   };
 
@@ -195,17 +200,17 @@ namespace multicam_calibration {
         cam.intrinsics.distortion_coeffs.size();
 
     }
+#if 0
     off = extrinsics_base + 6 * (cams.size() - 1);
     std::cout << "--------- camera poses ----------------" << std::endl;
     for (; off < (int)p.size(); off += 6) {
-#if 0
       const Vec<double, 3> rvec = Eigen::Map<const Vec<double, 3>>(&p[off]);
       Mat<double, 3, 3> R = rotation_matrix(rvec);
       const Vec<double, 3> t  = Eigen::Map<const Vec<double, 3>>(&p[off + 3]);
       std::cout << "rot: " << "[" << vec_to_str(&R(0,0), 9) << "] trans: ["
                 << vec_to_str(&t(0), 3) << "]" << std::endl;
-#endif
     }
+#endif
   }
 #endif
 
@@ -226,6 +231,7 @@ namespace multicam_calibration {
     if (worldPoints_.empty()) {
       worldPoints_.resize(calibrationData_.size());
       imagePoints_.resize(calibrationData_.size());
+      masks_.resize(calibrationData_.size());
     }
     if (wp.size() != calibrationData_.size() ||
         ip.size() != calibrationData_.size()) {
@@ -237,6 +243,7 @@ namespace multicam_calibration {
       worldPoints_[cam_idx].push_back(fwp);
       FrameImagePoints fip(ip[cam_idx].begin(), ip[cam_idx].end());
       imagePoints_[cam_idx].push_back(fip);
+      masks_[cam_idx].push_back(std::vector<bool>(fip.size(), true));
     }
     cam0PoseGuess_.push_back(cam0PoseGuess);
   }
@@ -305,6 +312,7 @@ namespace multicam_calibration {
     std::cout << summary.FullReport() << std::endl;
   }
 
+
   void Calibrator::testCalibration(Residuals *resptr) {
     auto &res = *resptr; // residuals
     const unsigned int num_frames = worldPoints_[0].size();
@@ -313,18 +321,13 @@ namespace multicam_calibration {
     for (const auto fnum : irange(0u, num_frames))  {
       std::vector<FrameWorldPoints> frame_world_points;
       std::vector<FrameImagePoints> frame_image_points;
-      unsigned int frame_num_points = 0;
-      for (const auto cam_idx : irange(0u, num_cameras)) {
-        frame_world_points.push_back(worldPoints_[cam_idx][fnum]);
-        frame_image_points.push_back(imagePoints_[cam_idx][fnum]);
-        if (calibrationData_[cam_idx].active) {
-          frame_num_points += frame_world_points[cam_idx].size();
-        }
-      }
+      std::vector<std::vector<bool>> masks;
+      size_t frame_num_points = getPointsAndMasks(fnum, &frame_world_points,
+                                                  &frame_image_points, &masks);
       res.push_back(std::vector<std::vector<Vec2d>>()); // empty for this frame
       if (frame_num_points > 0) {
         const auto fr = FrameResidual(frame_world_points, frame_image_points,
-                                      calibrationData_);
+                                      masks, calibrationData_);
         const unsigned numResiduals = 2 * frame_num_points;
         std::vector<double> residuals(numResiduals);
         // point offset to cam0 pose for this particular frame
@@ -334,8 +337,74 @@ namespace multicam_calibration {
         for (const auto cam_idx : irange(0u, num_cameras)) {
           res.back().push_back(std::vector<Vec2d>()); // empty for this camera
           if (calibrationData_[cam_idx].active) {
-            for (const auto res_idx : irange(0u, (unsigned int)worldPoints_[cam_idx][fnum].size())) {
-              res.back().back().push_back(Vec2d(residuals[res_idx * 2], residuals[res_idx * 2 + 1]));
+            size_t res_idx = 0;
+            for (const auto pt_idx : irange(0u, (unsigned int)worldPoints_[cam_idx][fnum].size())) {
+              if (masks_[cam_idx][fnum][pt_idx]) {
+                res.back().back().push_back(Vec2d(residuals[res_idx * 2], residuals[res_idx * 2 + 1]));
+                res_idx++;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  size_t Calibrator::getPointsAndMasks(
+    size_t fnum,
+    std::vector<FrameWorldPoints> *frame_world_points,
+    std::vector<FrameImagePoints> *frame_image_points,
+    std::vector<std::vector<bool>> *masks) const {
+    size_t frame_num_points{0};
+    for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
+      frame_world_points->push_back(worldPoints_[cam_idx][fnum]);
+      frame_image_points->push_back(imagePoints_[cam_idx][fnum]);
+      masks->push_back(masks_[cam_idx][fnum]);
+      if (calibrationData_[cam_idx].active) {
+        const size_t nvalid = std::count(
+          masks->back().begin(), masks->back().end(), true);
+        frame_num_points += nvalid;
+      }
+    }
+    return (frame_num_points);
+  }
+
+  void Calibrator::removeOutliers(double max_err) {
+    ROS_INFO_STREAM("removing outliers with pixel error more than " << max_err);
+    const double maxError2 = max_err * max_err;
+    const size_t num_frames = worldPoints_[0].size();
+    for (const auto fnum : irange(0ul, num_frames))  {
+      std::vector<FrameWorldPoints> frame_world_points;
+      std::vector<FrameImagePoints> frame_image_points;
+      std::vector<std::vector<bool>> masks;
+      
+      size_t frame_num_points = getPointsAndMasks(fnum, &frame_world_points,
+                                                  &frame_image_points, &masks);
+      if (frame_num_points > 0) {
+        const auto fr = FrameResidual(frame_world_points, frame_image_points,
+                                      masks, calibrationData_);
+        const unsigned numResiduals = 2 * frame_num_points;
+        std::vector<double> residuals(numResiduals);
+        // point offset to cam0 pose for this particular frame
+        std::vector<double *> params = params_to_blocks(calibrationData_, params_, fnum);
+        // compute residual for this frame
+        fr(&params[0], residuals.data());
+        // update mask
+        size_t res_idx = 0;
+        for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
+          if (calibrationData_[cam_idx].active) {
+            for (const auto pt_idx :
+                   irange(0u,(unsigned int)worldPoints_[cam_idx][fnum].size())) {
+              if (masks_[cam_idx][fnum][pt_idx]) {
+                const double dx2 = residuals[res_idx * 2] * residuals[res_idx * 2];
+                const double dy2 = residuals[res_idx * 2 + 1] * residuals[res_idx * 2 + 1];
+                if (dx2 + dy2 > maxError2) {
+                  masks_[cam_idx][fnum][pt_idx] = false; // mark point as bad
+                  ROS_INFO("dropping bad point cam: %1d, frame: %4d, pt: %3d, err: %6.2f",
+                           cam_idx, fnum, pt_idx, std::sqrt(dx2 + dy2));
+                }
+                res_idx++;
+              }
             }
           }
         }
@@ -407,20 +476,15 @@ namespace multicam_calibration {
     for(const auto i : irange(0u, num_frames))  {
       std::vector<FrameWorldPoints> frame_world_points;
       std::vector<FrameImagePoints> frame_image_points;
-      unsigned int frame_num_points = 0;
-      for(const auto cam_idx : irange(0u, num_cameras)) {
-        frame_world_points.push_back(worldPoints_[cam_idx][i]);
-        frame_image_points.push_back(imagePoints_[cam_idx][i]);
-        if (calibrationData_[cam_idx].active) {
-          frame_num_points += frame_world_points[cam_idx].size();
-        }
-      }
+      std::vector<std::vector<bool>> masks;
+      size_t frame_num_points = getPointsAndMasks(i, &frame_world_points,
+                                                  &frame_image_points, &masks);
       if (frame_num_points == 0) {
         // none of the active cameras sees any points in this frame!
         continue;
       }
       auto cost_function = new ceres::DynamicAutoDiffCostFunction<FrameResidual>(
-        new FrameResidual(frame_world_points, frame_image_points, calibrationData_));
+        new FrameResidual(frame_world_points, frame_image_points, masks, calibrationData_));
       std::vector<double *> v = params_to_blocks(calibrationData_, params, i);
       // per camera intrinsics
       for (const auto cam_idx : irange(0ul, calibrationData_.size())) {
