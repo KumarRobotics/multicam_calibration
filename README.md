@@ -209,7 +209,10 @@ In the ``calib/example`` directory you can now find the output of the calibratio
   and where the calibration results will go. The parameterization is
   somewhat confusing so it's best to look at the example launch files
   and/or the source code.
-
+- ``detector_type``: (default: ``Mit``) allows to switch between the
+  MIT and the ``Umich`` version of the apriltag implementation
+- ``tag_border``: (only valid if using the ``Mit`` detector, specifies
+  the width of the black border frame of the tags, defaults to 2).
 
 ## Managed calibrations
 

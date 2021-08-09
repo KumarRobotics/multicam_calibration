@@ -56,9 +56,21 @@ namespace multicam_calibration {
       tagFamily = apriltag_ros::TagFamily::tf16h5;
     }
     
-    detector_ = apriltag_ros::ApriltagDetector::Create(
-      apriltag_ros::DetectorType::Mit, tagFamily);
-    detector_->set_black_border(2);
+    const std::string detector_type =
+      nh.param<std::string>("detector_type", "Mit");
+    if (detector_type == "Mit") {
+      detector_ = apriltag_ros::ApriltagDetector::Create(
+        apriltag_ros::DetectorType::Mit, tagFamily);
+      const int tag_border = nh.param<int>("tag_border", 2);
+      detector_->set_black_border(tag_border);
+    } else if (detector_type == "Umich") {
+      detector_ = apriltag_ros::ApriltagDetector::Create(
+        apriltag_ros::DetectorType::Umich, tagFamily);
+      detector_->set_black_border(1);
+    } else {
+      ROS_ERROR_STREAM("invalid detector type: " << detector_type);
+      throw std::invalid_argument("invalid detector type!");
+    }
   }
 
   std::vector<apriltag_ros::ApriltagVec>
