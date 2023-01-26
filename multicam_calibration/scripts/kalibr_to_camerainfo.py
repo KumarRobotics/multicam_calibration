@@ -7,7 +7,7 @@ import numpy as np
 def read_yaml(filename):
     with open(filename, 'r') as y:
         try:
-            return yaml.load(y)
+            return yaml.load(y, Loader=yaml.FullLoader)
         except yaml.YAMLError as e:
             print(e)
 
@@ -55,7 +55,6 @@ def main():
     parser.add_argument("-n", "--camera_name", default=None, help="name of camera in camerainfo file")
     args = parser.parse_args()
 
-    print args.input
     kalibr_dict = read_yaml(args.input)
     camerainfo_dict = kalibr_to_camerainfo(kalibr_dict[args.camera], args.camera_name)
     write_yaml(camerainfo_dict, args.output)
