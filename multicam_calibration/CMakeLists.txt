@@ -113,6 +113,7 @@ install(TARGETS
 # Install python scripts
 install(PROGRAMS
   scripts/example_calib_manager.py
+  scripts/kalibr_to_camerainfo.py
   DESTINATION lib/${PROJECT_NAME}/)
 
 install(TARGETS
