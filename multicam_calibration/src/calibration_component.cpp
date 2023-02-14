@@ -356,10 +356,11 @@ static bool compute_RPQ(unsigned int cam1_idx, unsigned int cam2_idx,
         cv::Size(ci1.resolution[0], ci2.resolution[1]), rvec, tvec, *R1, *R2,
         *P1, *P2, *Q, cv::CALIB_ZERO_DISPARITY);
   } else if (distm == "radtan" || distm == "plumb_bob") {
-    // XXX never tested!
+    cv::Mat R = get_init_pose::tf_to_R(calib[cam2_idx].T_cn_cnm1);
+    cv::Mat T = get_init_pose::tf_to_T(calib[cam2_idx].T_cn_cnm1);
     cv::stereoRectify(K1, ci1.distortion_coeffs, K2, ci2.distortion_coeffs,
-                      cv::Size(ci1.resolution[0], ci2.resolution[1]), rvec,
-                      tvec, *R1, *R2, *P1, *P2, *Q);
+                      cv::Size(ci1.resolution[0], ci2.resolution[1]), R, T, *R1,
+                      *R2, *P1, *P2, *Q);
   } else {
     throw(std::runtime_error("unknown distortion model: " + distm));
   }
